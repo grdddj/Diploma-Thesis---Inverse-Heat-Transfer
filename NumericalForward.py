@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# QUESTION: What is the reason of this line - to run the file without writing "python3" in front of it?
 
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
@@ -8,15 +9,28 @@ import matplotlib.pyplot as plt  # some ploting backend - but you can change to 
 
 def Default_HeatFlux(t):
     return 1e5*np.sin(2*np.pi*t*(1/10))
+    # QUESTION: This is just an arbitrary value?
 
 def Default_AmbientTemperature(t):
     return 21
+    # QUESTION: Why are we supplying the 't' parameter?
+    # I wanted to have temperatures in Kelvins, but as long as we do not calculate
+    #   radiation, Celsius should be fine. Maybe storing lower numbers can make
+    #   it marginally faster, but it is just a wild guess
 
 # We will want to evaluate experimental data between points - makes stuff quite easier to handle
 def MakeDataCallable(x,y):
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html#scipy.interpolate.interp1d
+    # This interpolation is linear by default
     return interpolate.interp1d(x, y)
 
 # material properties - we can make some basic database of those, but I  would leave an option to define custom ones
+# Yeah, the DB will be provided, with the ability of defining custom materials.
+# I had an idea of implementing the material characteristics as a funtion,
+#   but I am afraid it would make the calculations slower, if we had to
+#   calculate it after each temperature change. What do you think - is it
+#   even possible to find temperature-depending functions for rho, cp and lmbd
+#   at least for some common materials?
 class Material:
     def __init__(self, rho, cp, lmbd):
         self.rho = rho  # Mass density
@@ -32,6 +46,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.L = Length  # length (thisckness of one-dimensional wall)
         self.Mat = Material  # material data
         self.N = int(N)  # number of elements in the model
+        #  https://docs.scipy.org/doc/numpy/reference/generated/numpy.empty.html
         self.T = np.empty(N+1)  # placeholder for actual temperatures in last evaluated step
         self.T_record = []  # Placeholder for the temperature history (list of numpy arrays)
         self.HeatFlux = HeatFlux  # Placeholder for heat flux at boundary (callable function)
@@ -39,12 +54,14 @@ class Simulation:  # In later objects abreviated as Sim
         self.T_amb = AmbientTemperature  # ambient temperature callable function
         self.t = []  # placeholder for the simulation point in time
         self.dx = Length/N  # size of one element
+        # https://docs.scipy.org/doc/numpy/reference/generated/numpy.linspace.html
         self.x = np.linspace(0, Length, N+1)  # x-positions of the nodes (temperatures)
 
         # Finite element method: matrix assembly using 1st order continuous Galerkin elements
         # (you dont have to understand the few following lines right now - I will explain to you in person what is happening bellow)
         # ----------------------------------------------------------------------------------------------------
         # Tridiagonal sparse mass matrix (contains information about heat capacity of the elements and how their temperatures react to incoming heat)
+        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html
         self.M = csr_matrix(self.dx*self.Mat.rho*self.Mat.cp*diags([1/6, 4/6, 1/6], [-1, 0, 1], shape=(N+1, N+1)))
 
         # Tridiagonal sparse stiffness matrix (contains information about heat conductivity and how the elements affect each other)
@@ -88,6 +105,7 @@ class DefaultCallBack:
         self.ExperimentData = ExperimentData
 
     def Call(self, Sim):
+        # https://docs.scipy.org/doc/numpy/reference/generated/numpy.interp.html
         self.TempHistoryAtPoint_x0.append(np.interp(self.x0, Sim.x, Sim.T))  # interpolate temperature value at position x0 from point around and save it
         if Sim.t[-1] > self.last_call + self.Call_at:  # if it is time to comunicate with GUI then show something
             plt.clf()
