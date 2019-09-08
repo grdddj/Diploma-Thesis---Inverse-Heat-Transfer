@@ -1,17 +1,19 @@
 """
 TODOS:
-    - authomatic saving of the results in CSV file and info png
+    - authomatic saving of the results in CSV file and into png
         - name it according to the material f.e.
-    - capturing of the result (error) and outputting it
-        - show that the simulation has ended
-    - measuring the time the simulation has been in progress
     - offer the creation of custom material/custom properties
         - consider showing the properties in the menu/next to it
         - consider moving materials to the DB (SQLite3)
-    - include some labels and legends in the graph
     - improve the design of the menus and buttons
     - include second graph showing heat flux
+    - look up the cx_Freeze to-exe module, as pyinstaller produces 300 MB .exe
+        - cx_Freeze offers deletion of unused libraries (scipy etc.)
+    - create second thread that is responsible for the calculation
+        - IDEA: running the calculation as a separate script, output the
+                results to the text_file and draw it continually from there
 """
+
 #!/usr/bin/env python3
 import tkinter as tk
 from tkinter import ttk
@@ -27,7 +29,8 @@ import time
 
 class NewCallback:
     """
-
+    Callback that is being applied to the simulation to draw data in real
+        time about the calculation.
     """
     def __init__(self, Call_at=100.0, plot_limits=[0, 5000, 20, 40], x0=0, ExperimentData=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
@@ -38,22 +41,33 @@ class NewCallback:
         self.ExperimentData = ExperimentData
 
     def Call(self, Sim):
+        """
+
+        """
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.interp.html
         self.TempHistoryAtPoint_x0.append(np.interp(self.x0, Sim.x, Sim.T))  # interpolate temperature value at position x0 from point around and save it
+        # Update the time calculation is in progress
+        app.frames[GraphView].update_elapsed_time()
         if Sim.t[-1] > self.last_call + self.Call_at:  # if it is time to comunicate with GUI then show something
 
             # Refreshing the graph with all the new time and temperature values
-            app.frames[GraphView].refresh_graph(Sim.t[1:], self.TempHistoryAtPoint_x0, self.ExperimentData[0], self.ExperimentData[1])
+            app.frames[GraphView].refresh_graph_with_new_values(Sim.t[1:], self.TempHistoryAtPoint_x0, self.ExperimentData[0], self.ExperimentData[1])
 
-            time.sleep(0.05) # without sleeping it is getting unresponsive sometimes
+            time.sleep(0.01) # without sleeping it is getting unresponsive sometimes
 
             print(f"Temperature at x0: {self.TempHistoryAtPoint_x0[-1]} at time {Sim.t[-1]} flux: {Sim.HeatFlux(Sim.t[-1])}")
             self.last_call += self.Call_at
 
+        # Stopping the simulation if we decide to
+        if app.frames[GraphView].simulation_should_stop:
+            return False
+
+        return True
+
 
 class HeatTransfer(tk.Tk):
     """
-
+    The core of the GUI, that is handling all other windows and frames.
     """
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
@@ -78,112 +92,220 @@ class HeatTransfer(tk.Tk):
 
         self.show_frame(GraphView)
 
-    def show_frame(self, cont):
-        frame = self.frames[cont]
+    def show_frame(self, container):
+        """
+        Displays the chosen container (frame) to the foreground.
+        """
+        frame = self.frames[container]
         frame.tkraise()
 
 
 class GraphView(tk.Frame):
     """
-
+    Class that contains the whole main window where the graph is located.
     """
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
 
+        # Attribute serving as a STOP sign to not continue with simulation
+        self.simulation_should_stop = False
+
+        # Saving the material we are simulating right now
+        self.chosen_material = None
+
+        # Saving the beginning of simulation to keep track of time
+        self.simulation_started_timestamp = 0
+
+        # Some information to the current release (what is working and what is not)
+        info_text = "INFO TEXT: " + \
+                    "Currently the Stop functionality is not working - as the " + \
+                    "window is busy with calculation, and is not listening to Stop button. " + \
+                    "Maybe it is, but it switches to unresponsive mode when trying to hit it. " + \
+                    "One possible solution would be to incorporate multithreading.\n" + \
+                    "The unsresponsivness while simulating is really bad, and will have to be taken care of."
+
+        show_message_text = tk.Text(self, bg="yellow", font=("Calibri", 15), bd=4)
+        show_message_text.place(relx=0, rely=0, relwidth=1, relheight=0.1)
+        show_message_text.insert("insert", info_text)
+        show_message_text["state"] = "disabled"
+
+
         # Top frame for the settings etc.
         self.frame_top = tk.Frame(self, bg="#42b6f4", bd=5)
-        self.frame_top.place(relx=0.5, rely=0.1, relwidth=0.7, relheight=0.2, anchor="n")
+        self.frame_top.place(relx=0.5, rely=0.15, relwidth=0.7, relheight=0.15, anchor="n")
 
-        self.initialize_menu(self.frame_top)
+        self.initialize_material_menu(self.frame_top)
 
-        self.button = tk.Button(self.frame_top, text="Run", bg="grey", fg="black", font=("Calibri", 15), command=lambda: self.run_the_test_with_chosen_material())
-        self.button.place(relx=0.75, rely=0, relheight=1, relwidth=0.25)
+        self.button_run_stop = tk.Button(self.frame_top, text="Run", bg="green", fg="black", font=("Calibri", 20), command=lambda: self.run_stop_button_action())
+        self.button_run_stop.place(relx=0.75, rely=0, relheight=1, relwidth=0.25)
+
+        self.elapsed_time_counter = tk.Label(self.frame_top, text="Elapsed time: ")
+        self.elapsed_time_counter.place(relx=0, rely=0.7,relheight=0.3, relwidth=0.2)
+
+        self.error_value_placeholder = tk.Label(self.frame_top, text="Error value: ")
+        self.error_value_placeholder.place(relx=0.25, rely=0.7,relheight=0.3, relwidth=0.2)
+
 
         # Bottom frame for the graph(s)
         self.frame_bottom = tk.Frame(self, bg="#42b6f4", bd=10)
         self.frame_bottom.place(relx=0.5, rely=0.35, relwidth=0.7, relheight=0.6, anchor="n")
 
-        self.initialize_graph(self.frame_bottom)
+        self.initialize_temperature_graph(self.frame_bottom)
 
-    def initialize_menu(self, container):
+    def initialize_material_menu(self, container):
         """
-
+        Renders menu to the screen and fills it with material options.
         """
-        self.MATERIALS_LIST = self.get_materials_from_csv_file()
-
-        print(len(self.MATERIALS_LIST))
-        self.material_names = [material["name"] for material in self.MATERIALS_LIST]
+        self.MATERIAL_DICTIONARY = self.get_materials_from_csv_file()
+        self.material_names_list = [key for key in self.MATERIAL_DICTIONARY]
 
         # Defining the OptionMenu for the choice of material
         self.material_choice = tk.StringVar(container)
-        self.material_choice.set(self.material_names[0]) # default value
+        self.material_choice.set(self.material_names_list[0]) # default value
 
-        self.menu = ttk.OptionMenu(container, self.material_choice, *self.material_names)
+        self.menu = ttk.OptionMenu(container, self.material_choice, *self.material_names_list)
         self.menu.place(relx=0, rely=0, relheight=0.25, relwidth=0.25)
 
-    def initialize_graph(self, container):
+    def initialize_temperature_graph(self, container):
         """
-
+        Renders graph into the window and gives it a template look.
         """
         f = Figure(figsize=(5,5), dpi=100)
         self.a = f.add_subplot(111)
-
+        self.a.set_title("1D Heat Transfer")
+        self.a.set_xlabel("Time [s]")
+        self.a.set_ylabel("Temperature [°C]")
         self.a.plot([], [])
 
         self.canvas = FigureCanvasTkAgg(f, container)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        # self.canvas.get_tk_widget().place(relx=0.05, rely=0.3, relwidth=0.9, relheight=0.65)
 
-    def refresh_graph(self, x_values, y_values, x_experiment_values=None, y_experiment_values=None):
+    def refresh_graph_with_new_values(self, x_values, y_values, x_experiment_values=None, y_experiment_values=None):
         """
-
+        Updates the graph after new values have been calculated.
+        TODO: research how the graph could be appended, and not replotted
+            from the scratch (which would increase efficiency).
         """
         print("refreshed!!!")
         self.a.cla()
-        self.a.plot(x_values, y_values)
+
+        self.a.set_title("1D Heat Transfer - {}".format(self.chosen_material))
+        self.a.set_xlabel("Time [s]")
+        self.a.set_ylabel("Temperature [°C]")
+        self.a.legend()
+
+        self.a.plot(x_values, y_values, label='Calculated Data')
         if x_experiment_values is not None and y_experiment_values is not None:
-            self.a.plot(x_experiment_values, y_experiment_values)
+            self.a.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
+
         self.canvas.draw()
+
+    def update_elapsed_time(self):
+        """
+        Determines how long the simulation has been already running and displays it.
+        """
+        now = time.time()
+        elapsed_time = round(now - self.simulation_started_timestamp, 2)
+
+        self.elapsed_time_counter["text"] = "Elapsed time: {} s".format(elapsed_time)
+
+    def display_error_value(self, error, margin=0.5):
+        """
+        Displays the numerical error that is the result of calculation.
+        If the error is bigger than some margin, then indicate failure with
+            red background - otherwise colour it green.
+        """
+        rounded_error = round(error, 2)
+        self.error_value_placeholder["text"] = "Error value: : {}".format(rounded_error)
+
+        if rounded_error < margin:
+            self.error_value_placeholder["bg"] = "green"
+        else:
+            self.error_value_placeholder["bg"] = "red"
 
     def get_materials_from_csv_file(self):
         """
-
+        Transfers material data from the CSV file into a python dictionary,
+            to be able to work with these data.
+        Returns:
+            (dictionary) Dictionary with keys being material names and values
+                         being material properties
         """
 
-        materials_list = []
+        materials_dictionary = {}
         with open("metals_properties.csv", "r") as materials_file:
             csvReader = csv.reader(materials_file)
             next(csvReader, None)  # skip first line (headers)
             for row in csvReader:
                 if row:
-                    material_dictionary = {}
-                    material_dictionary["name"] = row[0]
-                    material_dictionary["rho"] = row[2]
-                    material_dictionary["cp"] = row[3]
-                    material_dictionary["lmbd"] = row[4]
-                    materials_list.append(material_dictionary)
+                    name = row[0]
+                    material_properties = {}
 
-        return materials_list
+                    material_properties["rho"] = row[2]
+                    material_properties["cp"] = row[3]
+                    material_properties["lmbd"] = row[4]
+
+                    materials_dictionary[name] = material_properties
+
+        return materials_dictionary
+
+    def run_stop_button_action(self):
+        """
+        Determines what action should be done when user clicks the main
+            run/stop button.
+        If the button says "Run", then run the tests, otherwise abort the simulation.
+        """
+        if self.button_run_stop["text"] == "Run":
+            self.simulation_should_stop = False
+            self.run_the_test_with_chosen_material()
+        else:
+            # This itself will stop the simulation, because the callback
+            #   checks this variable after each loop
+            self.simulation_should_stop = True
+
+        return True
 
     def run_the_test_with_chosen_material(self):
         """
-
+        Determines which material we want to use, prepares all variables
+            for the test (resets them), and finally runs the test.
         """
+        # Determining the chosen material and it's properties
         chosen_material = self.material_choice.get()
+        chosen_material_properties = self.MATERIAL_DICTIONARY[chosen_material]
 
-        for material in self.MATERIALS_LIST:
-            if material["name"] == chosen_material:
-                rho = int(material["rho"])
-                cp = int(material["cp"])
-                lmbd = int(material["lmbd"])
-                break
+        # Assigning the properties we are interested in
+        rho = int(chosen_material_properties["rho"])
+        cp = int(chosen_material_properties["cp"])
+        lmbd = int(chosen_material_properties["lmbd"])
 
+        # Saving the chosen material to have access to it
+        self.chosen_material = chosen_material
+
+        # Putting the button to the testing state
+        self.button_run_stop["text"] = "Stop"
+        self.button_run_stop["bg"] = "red"
+
+        # Reseting all information from previous test
+        self.simulation_started_timestamp = time.time()
+        self.error_value_placeholder["bg"] = "white"
+        self.error_value_placeholder["text"] = "Error value: "
+
+        # Running the actual tests with the material data
         self.run_the_test(rho, cp, lmbd)
+
+        # Putting the button to it's original state
+        self.button_run_stop["text"] = "Run"
+        self.button_run_stop["bg"] = "green"
+
+        return True
+
 
     def run_the_test(self, rho, cp, lmbd):
         """
-
+        Contacts the mathematical model, supplies it desired inputs, runs
+            the simulation and processes the result.
         """
         t_data = []  # experimental data of time points
         T_data = []  # experimental data of temperature data at x0=0.008
@@ -221,13 +343,17 @@ class GraphView(tk.Frame):
         else:
             print("Test failed")
 
+        # Displaying the error value to the screen
+        self.display_error_value(ErrorNorm)
+
+        return True
+
         # I will send you The inverse solver later
         # I have to think how to make it compatible with NumericalForward.py in particular with the function EvaluateNewStep
 
 
-
 if __name__ == '__main__':
     app = HeatTransfer()
-    app.state("zoomed")
+    app.state("zoomed") # Making sure the window is maximized
 
     app.mainloop()

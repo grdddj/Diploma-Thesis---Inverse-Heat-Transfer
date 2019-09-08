@@ -129,4 +129,7 @@ def ForwardSimulation(Sim, theta=0.5, T0=0, dt=0.01, t_start=0, t_stop=100, Call
         Sim.T_record.append(Sim.T)  # push it to designated list
         Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
         if CallBack is not None:
-            CallBack.Call(Sim)  # do whatever the callback needs to do
+            # Do whatever the callback needs to do and stopping the simulation
+            #   if the callback returns False
+            if not CallBack.Call(Sim):
+                break
