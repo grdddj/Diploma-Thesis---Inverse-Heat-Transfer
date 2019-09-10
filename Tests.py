@@ -12,6 +12,7 @@ TODOS:
     - create second thread that is responsible for the calculation
         - IDEA: running the calculation as a separate script, output the
                 results to the text_file and draw it continually from there
+    - offer "run calculation on background" possibility (without any visual output)
 """
 """ TEMPORARY COMMENT:
     I had fixed the responsivenes bug when running the app in serial but...
@@ -50,6 +51,44 @@ TODOS:
     But there might be some caveat I did not think of and it can backfire heavily....
     And therefore I would totally leave that for later!!!
 
+------------------
+    I really appreciate the improvement you had done, which makes it more
+        than good enough for most purposes now - and after my today's unsuccessfull tries
+        to implement multiprocessing/threading I certainly agree further optimization
+        should be left for the future.
+
+    The idea of putting more threads or processes into the computation itself
+        sounds very appealing, and should certainly be tried later.
+
+    What I spent some time today was trying to implement some basic multiprocessing
+        and multithreading with the shared variable (Queue) between the calculating
+        piece of program and the GUI - with GUI checking the variable for new
+        values in regular intervals.
+    I started with multiprocessing, and I was constantly receiving some "pickling"
+        error from TKinter, which after googling it is basically saying
+        the TKinter cannot be used at all with multiprocessing.
+    With multithreading I had more luck, managed to make it run, but it was
+        slow as hell - the whole simulation took about 35 seconds (compared to
+        approximately 10 in a normal case).
+    I find this strange, because the other computing thread should not do the
+        calculations anyhow slower than the main thread - so I suspect the real
+        time-sink is caused by the overhead and probably communication between
+        the threads over the shared variable.
+
+    In the end I did not make any changes to the master, just put back the error-showing and
+        fixed the legend-plotting. I also slightly modified the max_iter and refreshing
+        period, as it made the whole process faster with no visible effect on responsiveness.
+
+    As I wrote all above, I start thinking more and more that the solution with
+        having a separate script for the calculation - boosted on many threads -
+        and communicating with a GUI through a file (I really liked your definition
+        of "message parsing interface") can be the way to go.
+    What also ocurred to me, that the "live" with high refreshing frequency
+        is beneficial only when the calculation is expected to take just
+        a little time - when the simulation would be run overnight, nobody
+        cares so much about getting the data plotted, so we could offer
+        a functionality of really only running the script on the background,
+        which would do the calculations and then just save the results (csv and jpg).
 """
 
 
@@ -221,12 +260,12 @@ class GraphView(tk.Frame):
         self.a.set_title("1D Heat Transfer - {}".format(self.chosen_material))
         self.a.set_xlabel("Time [s]")
         self.a.set_ylabel("Temperature [°C]")
-        self.a.legend()
 
         self.a.plot(x_values, y_values, label='Calculated Data')
         if x_experiment_values is not None and y_experiment_values is not None:
             self.a.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
 
+        self.a.legend()
         self.canvas.draw()
 
     def update_elapsed_time(self):
@@ -349,7 +388,7 @@ class GraphView(tk.Frame):
                 T_amb_data.append(float(row[3]))
 
         test_q = MakeDataCallable(t_data, q_data)  # colapse data into callable function test_q(t)
-        T_experiment = MakeDataCallable(t_data, T_data)  # colapse data into callable function T_experiment(t)
+        self.T_experiment = MakeDataCallable(t_data, T_data)  # colapse data into callable function T_experiment(t)
         T_amb = MakeDataCallable(t_data, T_amb_data)  # colapse data into callable function T_amb(t)
         # Look into NumericalForward.py for details
 
@@ -364,13 +403,16 @@ class GraphView(tk.Frame):
         self.Sim.T_record.append(self.Sim.T)  # save initial step
         return True
 
-    def make_sim_step(self, max_loop_iter=10):
+    def make_sim_step(self, max_loop_iter=20):
         # max_loop_iter value affect performance -> the higher the faster simulation but GUI gets less responsive
         dt = 1.0  # TODO : make this a choice in the GUI
         iter = 0
         if self.Sim.t[-1] >= self.t_stop:
             self.button_run_stop["text"] = "Run"
             self.button_run_stop["bg"] = "green"
+
+            ErrorNorm = np.sum(abs(self.MyCallBack.TempHistoryAtPoint_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])  # average temperature error
+            self.display_error_value(ErrorNorm)
 
         # enter the loop temporarily and hand the control back to the GUI afterwards
         while self.Sim.t[-1] < self.t_stop and iter <= max_loop_iter:
@@ -383,7 +425,7 @@ class GraphView(tk.Frame):
         if not self.simulation_should_stop:
             # https://stackoverflow.com/questions/29158220/tkinter-understanding-mainloop
             # Calls itself after 3ms (this might get it laggy if too low) so other stuff can happen in the app.mainloop in those 3ms
-            self.after(3, self.make_sim_step)
+            self.after(1, self.make_sim_step)
 
 if __name__ == '__main__':
     app = HeatTransfer()
