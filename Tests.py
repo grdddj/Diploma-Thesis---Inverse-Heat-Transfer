@@ -13,8 +13,46 @@ TODOS:
         - IDEA: running the calculation as a separate script, output the
                 results to the text_file and draw it continually from there
 """
+""" TEMPORARY COMMENT:
+    I had fixed the responsivenes bug when running the app in serial but...
+    I do agree with the approach to make the calculation loop completely separate process
+    The communication should be done through some custom message parsing interface.
+    For example (as you say correctly in my opinion), the calculation loop can continuously
+    output the results to some temporary file(s) while continuously checking values in another text file
+    to obtain information on what it should do next (stop, continue, pause or something).
 
-#!/usr/bin/env python3
+    Something in the sense of:
+    def run_stop_button_action(self):
+
+        if self.button_run_stop["text"] == "Run":
+            self.Input_File.set_Stop_Value(False)
+            # Runs completely separate thing
+            os.system("start python3 CalculationScript.py self.pathToInputFile self.pathToOutputFile")
+            # or even with fenics
+            # os.system("start mpirun -n 10 python3 ParallelCalculationScript.py self.pathToInputFile self.pathToOutputFile")
+        else:
+            self.Input_File.set_Stop_Value(True)
+        return True
+
+    - I has several advantages:
+        1) If the GUI crashes the calculation loop does not, which is nice
+        2) If the calculation loop crashes the GUI does not, which is also nice
+        3) If the calculation loop crashes we will still have the intermediate
+           results in the output file so we can continue from there after reboot, which is really nice
+           regarding the fact that some more complex calculation can take quite a while to finish.
+        4) The calculation loop will not be slowed down by updating the plots,
+           since the GUI will take care of that as often as it will comfortably handle.
+        5) If we implement some parallelism inside the calculation loop itself,
+           which seems super easy with FeniCS (at least what I have tried with it - not completely
+           sure about the inverse stuff) and it will run let's say with 10 threads, it will be
+           much easier to handle the responsiveness of the GUI since it can still be run in serial.
+
+    But there might be some caveat I did not think of and it can backfire heavily....
+    And therefore I would totally leave that for later!!!
+
+"""
+
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter import font
@@ -53,14 +91,8 @@ class NewCallback:
             # Refreshing the graph with all the new time and temperature values
             app.frames[GraphView].refresh_graph_with_new_values(Sim.t[1:], self.TempHistoryAtPoint_x0, self.ExperimentData[0], self.ExperimentData[1])
 
-            time.sleep(0.01) # without sleeping it is getting unresponsive sometimes
-
             print(f"Temperature at x0: {self.TempHistoryAtPoint_x0[-1]} at time {Sim.t[-1]} flux: {Sim.HeatFlux(Sim.t[-1])}")
             self.last_call += self.Call_at
-
-        # Stopping the simulation if we decide to
-        if app.frames[GraphView].simulation_should_stop:
-            return False
 
         return True
 
@@ -118,11 +150,7 @@ class GraphView(tk.Frame):
 
         # Some information to the current release (what is working and what is not)
         info_text = "INFO TEXT: " + \
-                    "Currently the Stop functionality is not working - as the " + \
-                    "window is busy with calculation, and is not listening to Stop button. " + \
-                    "Maybe it is, but it switches to unresponsive mode when trying to hit it. " + \
-                    "One possible solution would be to incorporate multithreading.\n" + \
-                    "The unsresponsivness while simulating is really bad, and will have to be taken care of."
+                    "The Stop button is working now, there are some adjustments needed in the make_sim_step function though"
 
         show_message_text = tk.Text(self, bg="yellow", font=("Calibri", 15), bd=4)
         show_message_text.place(relx=0, rely=0, relwidth=1, relheight=0.1)
@@ -256,20 +284,24 @@ class GraphView(tk.Frame):
             run/stop button.
         If the button says "Run", then run the tests, otherwise abort the simulation.
         """
+        # TODO: Consider making Pause option as well - basically allows to skips the Prepare stuff when unpausing..
         if self.button_run_stop["text"] == "Run":
             self.simulation_should_stop = False
-            self.run_the_test_with_chosen_material()
+            self.Prepare_Simulation_with_chosen_material()
+            self.make_sim_step()  # enter the Simulation loop
         else:
             # This itself will stop the simulation, because the callback
             #   checks this variable after each loop
             self.simulation_should_stop = True
+            self.button_run_stop["text"] = "Run"
+            self.button_run_stop["bg"] = "green"
 
         return True
 
-    def run_the_test_with_chosen_material(self):
+    def Prepare_Simulation_with_chosen_material(self):
         """
         Determines which material we want to use, prepares all variables
-            for the test (resets them), and finally runs the test.
+            for the test (resets them), and finally prepares the simulation
         """
         # Determining the chosen material and it's properties
         chosen_material = self.material_choice.get()
@@ -292,20 +324,14 @@ class GraphView(tk.Frame):
         self.error_value_placeholder["bg"] = "white"
         self.error_value_placeholder["text"] = "Error value: "
 
-        # Running the actual tests with the material data
-        self.run_the_test(rho, cp, lmbd)
-
-        # Putting the button to it's original state
-        self.button_run_stop["text"] = "Run"
-        self.button_run_stop["bg"] = "green"
+        # Preparing the actual tests with the material data
+        self.PrepareSimulation(rho, cp, lmbd)
 
         return True
 
-
-    def run_the_test(self, rho, cp, lmbd):
+    def PrepareSimulation(self, rho, cp, lmbd):
         """
-        Contacts the mathematical model, supplies it desired inputs, runs
-            the simulation and processes the result.
+        Defines inputs and initial Simulation state (Sim) for make_sim_step
         """
         t_data = []  # experimental data of time points
         T_data = []  # experimental data of temperature data at x0=0.008
@@ -329,31 +355,44 @@ class GraphView(tk.Frame):
 
         # This  is how the experiment recorded in DATA.csv was aproximately done
         SteinlessSteel = Material(rho, cp, lmbd)
-        TestSim = Simulation(Length=0.010, Material=SteinlessSteel, N=100, HeatFlux=test_q, AmbientTemperature=T_amb, RobinAlpha=13.5)
-        MyCallBack = NewCallback(x0=0.00445, plot_limits=[t_data[0], t_data[-1], min(T_data), max(T_data)], ExperimentData=(t_data, T_data))
-
-        ForwardSimulation(TestSim, dt=1.0, T0=T_data[0], t_stop=max(t_data)-1, CallBack=MyCallBack)
-
-        # we check if Simulationn fits the experimental data
-        ErrorNorm = np.sum(abs(MyCallBack.TempHistoryAtPoint_x0 - T_experiment(TestSim.t[1:])))/len(TestSim.t[1:])  # average temperature error
-
-        print(ErrorNorm)  # the reason why it is not completely the same is because the actual experiment was not complentely one-dimensional (that is often the case)
-        if ErrorNorm < 0.5:
-            print("Test passed")
-        else:
-            print("Test failed")
-
-        # Displaying the error value to the screen
-        self.display_error_value(ErrorNorm)
-
+        self.Sim = Simulation(Length=0.010, Material=SteinlessSteel, N=100, HeatFlux=test_q, AmbientTemperature=T_amb, RobinAlpha=13.5)
+        self.MyCallBack = NewCallback(x0=0.00445, plot_limits=[t_data[0], t_data[-1], min(T_data), max(T_data)], ExperimentData=(t_data, T_data))
+        self.t_start = t_data[0]
+        self.t_stop = t_data[-1]-1
+        self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
+        self.Sim.T.fill(T_data[0])  # fill initial temperature with value of T0
+        self.Sim.T_record.append(self.Sim.T)  # save initial step
         return True
 
-        # I will send you The inverse solver later
-        # I have to think how to make it compatible with NumericalForward.py in particular with the function EvaluateNewStep
+    def make_sim_step(self, max_loop_iter=10):
+        # max_loop_iter value affect performance -> the higher the faster simulation but GUI gets less responsive
+        dt = 1.0  # TODO : make this a choice in the GUI
+        iter = 0
+        if self.Sim.t[-1] >= self.t_stop:
+            self.button_run_stop["text"] = "Run"
+            self.button_run_stop["bg"] = "green"
 
+        # enter the loop temporarily and hand the control back to the GUI afterwards
+        while self.Sim.t[-1] < self.t_stop and iter <= max_loop_iter:
+            self.Sim.T = EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
+            self.Sim.T_record.append(self.Sim.T)  # push it to designated list
+            self.Sim.t.append(self.Sim.t[-1] + dt)  # push time step to its list
+            self.MyCallBack.Call(self.Sim)
+            iter += 1
+
+        if not self.simulation_should_stop:
+            # https://stackoverflow.com/questions/29158220/tkinter-understanding-mainloop
+            # Calls itself after 3ms (this might get it laggy if too low) so other stuff can happen in the app.mainloop in those 3ms
+            self.after(3, self.make_sim_step)
 
 if __name__ == '__main__':
     app = HeatTransfer()
-    app.state("zoomed") # Making sure the window is maximized
+
+    # https://www.oreilly.com/library/view/python-gui-programming/9781788835886/984b9be2-7c26-445e-9f94-ba8fef208ee0.xhtml
+    # Making sure the window is maximized - Platform specific
+    if os.name == 'posix':
+        app.attributes('-zoomed', True)  # Unix System (X11)
+    else:
+        app.state("zoomed")  # Windows and MacOS
 
     app.mainloop()

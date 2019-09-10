@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # QUESTION: What is the reason of this line - to run the file without writing "python3" in front of it?
+# ANSWER: Yes, although I am not sure if it works with all operating systems, (Linux terminal: ./script.py starts the script without python3 infront of it)
+# NOTE: It has to be the fist line in the file otherwise it will not work!
 
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
@@ -10,13 +12,23 @@ import matplotlib.pyplot as plt  # some ploting backend - but you can change to 
 def Default_HeatFlux(t):
     return 1e5*np.sin(2*np.pi*t*(1/10))
     # QUESTION: This is just an arbitrary value?
+    # ASWER: Yes, I was using this to experiment before I have added the DATA.csv
 
 def Default_AmbientTemperature(t):
     return 21
     # QUESTION: Why are we supplying the 't' parameter?
+    # ANSWER: The kwarg AmbientTemperature in Simulation.__init__ should be function of time,
+    #   even if it returns value that is constant in time.
     # I wanted to have temperatures in Kelvins, but as long as we do not calculate
     #   radiation, Celsius should be fine. Maybe storing lower numbers can make
     #   it marginally faster, but it is just a wild guess
+    # You can totally have Kelvins, the algorithm should be compatible with it,
+    #   but the DATA.csv were in degrees of Celsia so I put 21 in.
+    #   You can include some switch-buton which converts the teperature to kelvins right after it reads them from the DATA.csv.
+    #   In general the experimantal data can come with Celsia, Kelvins or even Fahrenheit.
+    # The lower numbers should not make speed difference,
+    #   it is all floats anyway so I think it has to do the same
+    #   amount of work (bitwise speaking) when performing the calculations.
 
 # We will want to evaluate experimental data between points - makes stuff quite easier to handle
 def MakeDataCallable(x,y):
@@ -31,6 +43,14 @@ def MakeDataCallable(x,y):
 #   calculate it after each temperature change. What do you think - is it
 #   even possible to find temperature-depending functions for rho, cp and lmbd
 #   at least for some common materials?
+# We could find some temperature depending material properties, but the way we would
+#   have to handle the calculatinos would be super-slow when using python directly as we do here.
+#   It would basically require to recalculate the Sim.M and Sim.K every step and the induced non-linearity of it
+#   would require insertion of Newton type solver rigth in between the time-stepping and the linear spsolve.
+#   Then imagine the inverse solver around all of that stuff... ouch!
+#   We might try that with the FeniCS library though, which would handle bunch of these stuff automatically,
+#   but the slowness might be still quite painful (usually these kind of complexity requires more CPU cores, and heavy paralelisation).
+#   I would start with the constant propperty and then see how fast it can be implemented.
 class Material:
     def __init__(self, rho, cp, lmbd):
         self.rho = rho  # Mass density
