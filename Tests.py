@@ -178,23 +178,28 @@ class GraphView(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
 
-        # Attribute serving as a STOP sign to not continue with simulation
-        self.simulation_should_stop = False
+        # Having access to the current state of the simulation
+        # Can be either "running", "paused", "stopped" or "finished"
+        self.simulation_state = None
 
         # Saving the material we are simulating right now
         self.chosen_material = None
 
         # Saving the beginning of simulation to keep track of time
+        # TODO: create logic for the pausing button pausing the time-flow
         self.simulation_started_timestamp = 0
 
         # Some information to the current release (what is working and what is not)
         info_text = "INFO TEXT: " + \
                     "The Stop button is working now, there are some adjustments needed in the make_sim_step function though"
 
-        show_message_text = tk.Text(self, bg="yellow", font=("Calibri", 15), bd=4)
-        show_message_text.place(relx=0, rely=0, relwidth=1, relheight=0.1)
-        show_message_text.insert("insert", info_text)
-        show_message_text["state"] = "disabled"
+        self.show_message_text = tk.Text(self, bg="yellow", font=("Calibri", 15), bd=4)
+        self.show_message_text.place(relx=0, rely=0, relwidth=1, relheight=0.1)
+        self.show_message_text.insert("insert", info_text)
+
+        # Label for some messages to user (errors etc.)
+        self.message_to_user = tk.Label(self, fg="red", font=("Calibri", 20))
+        self.message_to_user.place(relx=0, rely=0.1, relwidth=1, relheight=0.05)
 
 
         # Top frame for the settings etc.
@@ -203,12 +208,31 @@ class GraphView(tk.Frame):
 
         self.initialize_material_menu(self.frame_top)
 
-        self.button_run_stop = tk.Button(self.frame_top, text="Run", bg="green", fg="black", font=("Calibri", 20), command=lambda: self.run_stop_button_action())
-        self.button_run_stop.place(relx=0.75, rely=0, relheight=1, relwidth=0.25)
+        # dt value label and input
+        self.dt_value_label = tk.Label(self.frame_top, text="dt value [s]: ")
+        self.dt_value_label.place(relx=0, rely=0.3, relheight=0.3, relwidth=0.1)
+        self.dt_value_input = tk.Entry(self.frame_top, font=("Calibri", 20))
+        self.dt_value_input.place(relx=0.11, rely=0.3, relheight=0.3, relwidth=0.1)
+        self.dt_value_input.insert(0, "1.0")
 
+        # Button used to run the simulation
+        self.run_button = tk.Button(self.frame_top, text="Run", bg="green", fg="black", bd=2, relief="ridge", font=("Calibri", 20), command=lambda: self.run_button_action())
+        self.run_button.place(relx=0.55, rely=0, relheight=1, relwidth=0.15)
+
+        # Button used to pause the simulation
+        self.pause_button = tk.Button(self.frame_top, text="Pause", bg="orange", fg="black", bd=2, relief="ridge", font=("Calibri", 20), command=lambda: self.pause_button_action())
+        self.pause_button.place(relx=0.7, rely=0, relheight=1, relwidth=0.15)
+
+        # Button used to stop the simulation
+        self.stop_button = tk.Button(self.frame_top, text="Stop", bg="red", fg="black", bd=2, relief="ridge", font=("Calibri", 20), command=lambda: self.stop_button_action())
+        self.stop_button.place(relx=0.85, rely=0, relheight=1, relwidth=0.15)
+
+
+        # Label showing the elapsed time during the simulation
         self.elapsed_time_counter = tk.Label(self.frame_top, text="Elapsed time: ")
         self.elapsed_time_counter.place(relx=0, rely=0.7,relheight=0.3, relwidth=0.2)
 
+        # Label showing the error value after the simulation finishes
         self.error_value_placeholder = tk.Label(self.frame_top, text="Error value: ")
         self.error_value_placeholder.place(relx=0.25, rely=0.7,relheight=0.3, relwidth=0.2)
 
@@ -230,8 +254,10 @@ class GraphView(tk.Frame):
         self.material_choice = tk.StringVar(container)
         self.material_choice.set(self.material_names_list[0]) # default value
 
-        self.menu = ttk.OptionMenu(container, self.material_choice, *self.material_names_list)
-        self.menu.place(relx=0, rely=0, relheight=0.25, relwidth=0.25)
+        self.material_label = tk.Label(container, text="Material: ")
+        self.material_label.place(relx=0, rely=0, relheight=0.25, relwidth=0.1)
+        self.material_menu = ttk.OptionMenu(container, self.material_choice, *self.material_names_list)
+        self.material_menu.place(relx=0.11, rely=0, relheight=0.25, relwidth=0.1)
 
     def initialize_temperature_graph(self, container):
         """
@@ -254,7 +280,6 @@ class GraphView(tk.Frame):
         TODO: research how the graph could be appended, and not replotted
             from the scratch (which would increase efficiency).
         """
-        print("refreshed!!!")
         self.a.cla()
 
         self.a.set_title("1D Heat Transfer - {}".format(self.chosen_material))
@@ -317,27 +342,58 @@ class GraphView(tk.Frame):
 
         return materials_dictionary
 
-    def run_stop_button_action(self):
+    def run_button_action(self):
         """
-        Determines what action should be done when user clicks the main
-            run/stop button.
-        If the button says "Run", then run the tests, otherwise abort the simulation.
+        Runs the simulation after clicking the Run button. Depending on the
+            previous state, it either starts a completely new simulation, or
+            continue with the previous one.
+        Do not perform any action when the simulation is already running.
         """
-        # TODO: Consider making Pause option as well - basically allows to skips the Prepare stuff when unpausing..
-        if self.button_run_stop["text"] == "Run":
-            self.simulation_should_stop = False
-            self.Prepare_Simulation_with_chosen_material()
-            self.make_sim_step()  # enter the Simulation loop
-        else:
-            # This itself will stop the simulation, because the callback
-            #   checks this variable after each loop
-            self.simulation_should_stop = True
-            self.button_run_stop["text"] = "Run"
-            self.button_run_stop["bg"] = "green"
 
-        return True
+        if self.simulation_state == "running":
+            return
 
-    def Prepare_Simulation_with_chosen_material(self):
+        # Prepare for the simulation (unless in paused state)
+        if self.simulation_state != "paused":
+            self.prepare_simulation_with_chosen_material()
+
+        self.simulation_state = "running"
+        self.run_button["bd"] = 20
+        self.pause_button["bd"] = 2
+        self.stop_button["bd"] = 2
+
+        self.make_sim_step()  # enter the Simulation loop
+
+    def pause_button_action(self):
+        """
+        Pauses the simulation after clicking the Pause button.
+        Perform the action only when the simulation is running or stopped.
+        """
+        if self.simulation_state in ["running", "stopped"]:
+            self.simulation_state = "paused"
+            self.run_button["bd"] = 2
+            self.pause_button["bd"] = 20
+            self.stop_button["bd"] = 2
+
+    def stop_button_action(self):
+        """
+        Stops the simulation after clicking the Stop button.
+        Perform the action only when the simulation is running or paused.
+        """
+        if self.simulation_state in ["running", "paused"]:
+            self.simulation_state = "stopped"
+            self.run_button["bd"] = 2
+            self.pause_button["bd"] = 2
+            self.stop_button["bd"] = 20
+            self.dt_value_input["state"] = "normal"
+
+    def show_message_to_the_user(self, message):
+        """
+        Shows a custom message to the user, informing him of some errors or actions
+        """
+        self.message_to_user["text"] = message
+
+    def prepare_simulation_with_chosen_material(self):
         """
         Determines which material we want to use, prepares all variables
             for the test (resets them), and finally prepares the simulation
@@ -353,10 +409,6 @@ class GraphView(tk.Frame):
 
         # Saving the chosen material to have access to it
         self.chosen_material = chosen_material
-
-        # Putting the button to the testing state
-        self.button_run_stop["text"] = "Stop"
-        self.button_run_stop["bg"] = "red"
 
         # Reseting all information from previous test
         self.simulation_started_timestamp = time.time()
@@ -401,31 +453,59 @@ class GraphView(tk.Frame):
         self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
         self.Sim.T.fill(T_data[0])  # fill initial temperature with value of T0
         self.Sim.T_record.append(self.Sim.T)  # save initial step
+
+        # Getting the dt value from the user input
+        # TODO: when value was 2.0, we got "ValueError: A value in x_new is above the interpolation range."
+        #   on the self.Sim.T = EvaluateNewStep(self.Sim, self.dt, 0.5) line
+        try:
+            # Replacing comma with a dot (for those used to writing decimals places with a comma)
+            dt_value = self.dt_value_input.get().replace(",", ".")
+            self.dt = float(dt_value)
+        # If the value is still not parseable to float, make it a default 1.0
+        #   and notify the user of it
+        except:
+            self.dt = 1.0
+            self.dt_value_input.delete(0, "end")
+            self.dt_value_input.insert(0, "1.0")
+            self.show_message_to_the_user("ERROR: Your dt value was not a valid number! We gave it a default of 1 second.")
+        # Making the input disbled for changes during the calculation
+        self.dt_value_input["state"] = "disabled"
+
         return True
 
-    def make_sim_step(self, max_loop_iter=20):
-        # max_loop_iter value affect performance -> the higher the faster simulation but GUI gets less responsive
-        dt = 1.0  # TODO : make this a choice in the GUI
-        iter = 0
+    def make_sim_step(self):
+        """
+        Calculates some small amount of steps, before handing control to GUI
+            for a while, which will call it again in a short moment.
+
+        TODO: decide, how to handle parameters like dt and max_iter - whether
+            to have them as inputs to the function, or instance variables
+            - with the lambda function in after() it is possible to input
+              parameters into the self-calling function
+        """
         if self.Sim.t[-1] >= self.t_stop:
-            self.button_run_stop["text"] = "Run"
-            self.button_run_stop["bg"] = "green"
+            self.run_button["bd"] = 2
+            self.simulation_state = "finished"
+            self.dt = None # Setting the value back to undefined, to be udpated the next run
+            self.dt_value_input["state"] = "normal" # Allowing to modify the dt input again
 
             ErrorNorm = np.sum(abs(self.MyCallBack.TempHistoryAtPoint_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])  # average temperature error
             self.display_error_value(ErrorNorm)
 
+        iter = 0
+        max_loop_iter = 20
         # enter the loop temporarily and hand the control back to the GUI afterwards
         while self.Sim.t[-1] < self.t_stop and iter <= max_loop_iter:
-            self.Sim.T = EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
+            self.Sim.T = EvaluateNewStep(self.Sim, self.dt, 0.5)  # evaluate Temperaures at step k
             self.Sim.T_record.append(self.Sim.T)  # push it to designated list
-            self.Sim.t.append(self.Sim.t[-1] + dt)  # push time step to its list
+            self.Sim.t.append(self.Sim.t[-1] + self.dt)  # push time step to its list
             self.MyCallBack.Call(self.Sim)
             iter += 1
 
-        if not self.simulation_should_stop:
+        if self.simulation_state == "running":
             # https://stackoverflow.com/questions/29158220/tkinter-understanding-mainloop
             # Calls itself after 3ms (this might get it laggy if too low) so other stuff can happen in the app.mainloop in those 3ms
-            self.after(1, self.make_sim_step)
+            self.after(1, lambda: self.make_sim_step())
 
 if __name__ == '__main__':
     app = HeatTransfer()
