@@ -455,8 +455,6 @@ class GraphView(tk.Frame):
         self.Sim.T_record.append(self.Sim.T)  # save initial step
 
         # Getting the dt value from the user input
-        # TODO: when value was 2.0, we got "ValueError: A value in x_new is above the interpolation range."
-        #   on the self.Sim.T = EvaluateNewStep(self.Sim, self.dt, 0.5) line
         try:
             # Replacing comma with a dot (for those used to writing decimals places with a comma)
             dt_value = self.dt_value_input.get().replace(",", ".")
@@ -496,9 +494,10 @@ class GraphView(tk.Frame):
         max_loop_iter = 20
         # enter the loop temporarily and hand the control back to the GUI afterwards
         while self.Sim.t[-1] < self.t_stop and iter <= max_loop_iter:
-            self.Sim.T = EvaluateNewStep(self.Sim, self.dt, 0.5)  # evaluate Temperaures at step k
+            dt = min(self.dt, self.t_stop-self.Sim.t[-1])  # checking if not surpassing t_stop
+            self.Sim.T = EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
             self.Sim.T_record.append(self.Sim.T)  # push it to designated list
-            self.Sim.t.append(self.Sim.t[-1] + self.dt)  # push time step to its list
+            self.Sim.t.append(self.Sim.t[-1] + dt)  # push time step to its list
             self.MyCallBack.Call(self.Sim)
             iter += 1
 
