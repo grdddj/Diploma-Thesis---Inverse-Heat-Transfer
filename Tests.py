@@ -1,7 +1,8 @@
 """
 TODOS:
-    - authomatic saving of the results in CSV file and into png
-        - name it according to the material f.e.
+    - offer the option of regular savings (useful in time-consuming simulations)
+    - discuss the naming of the saved files
+        - what information to incorporate there (dt etc.)
     - offer the creation of custom material/custom properties
         - consider showing the properties in the menu/next to it
         - consider moving materials to the DB (SQLite3)
@@ -263,14 +264,14 @@ class GraphView(tk.Frame):
         """
         Renders graph into the window and gives it a template look.
         """
-        f = Figure(figsize=(5,5), dpi=100)
-        self.a = f.add_subplot(111)
-        self.a.set_title("1D Heat Transfer")
-        self.a.set_xlabel("Time [s]")
-        self.a.set_ylabel("Temperature [°C]")
-        self.a.plot([], [])
+        self.temperature_figure = Figure(figsize=(5,5), dpi=100)
+        self.temperature_subplot = self.temperature_figure.add_subplot(111)
+        self.temperature_subplot.set_title("1D Heat Transfer")
+        self.temperature_subplot.set_xlabel("Time [s]")
+        self.temperature_subplot.set_ylabel("Temperature [°C]")
+        self.temperature_subplot.plot([], [])
 
-        self.canvas = FigureCanvasTkAgg(f, container)
+        self.canvas = FigureCanvasTkAgg(self.temperature_figure, container)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
@@ -280,17 +281,17 @@ class GraphView(tk.Frame):
         TODO: research how the graph could be appended, and not replotted
             from the scratch (which would increase efficiency).
         """
-        self.a.cla()
+        self.temperature_subplot.cla()
 
-        self.a.set_title("1D Heat Transfer - {}".format(self.chosen_material))
-        self.a.set_xlabel("Time [s]")
-        self.a.set_ylabel("Temperature [°C]")
+        self.temperature_subplot.set_title("1D Heat Transfer - {}".format(self.chosen_material))
+        self.temperature_subplot.set_xlabel("Time [s]")
+        self.temperature_subplot.set_ylabel("Temperature [°C]")
 
-        self.a.plot(x_values, y_values, label='Calculated Data')
+        self.temperature_subplot.plot(x_values, y_values, label='Calculated Data')
         if x_experiment_values is not None and y_experiment_values is not None:
-            self.a.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
+            self.temperature_subplot.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
 
-        self.a.legend()
+        self.temperature_subplot.legend()
         self.canvas.draw()
 
     def update_elapsed_time(self):
@@ -315,6 +316,30 @@ class GraphView(tk.Frame):
             self.error_value_placeholder["bg"] = "green"
         else:
             self.error_value_placeholder["bg"] = "red"
+
+    def save_results_to_png_file(self, figure_which_to_save, initial_temperature, last_time_value, material, method):
+        """
+        Outputs the (semi)results of a simulation into a PNG file and names it
+            accordingly.
+        """
+        # TODO: discuss the possible filename structure
+        file_name = "{}-{}-{}C-{}s.png".format(method, material, int(initial_temperature), int(last_time_value))
+        figure_which_to_save.savefig(file_name)
+
+    def save_results_to_csv_file(self, time_values, temperature_values, material, method):
+        """
+        Outputs the (semi)results of a simulation into a CSV file and names it
+            accordingly.
+        """
+        # TODO: discuss the possible filename structure
+        file_name = "{}-{}-{}C-{}s.csv".format(method, material, int(temperature_values[0]), int(time_values[-1]))
+        with open(file_name, "w") as csv_file:
+            csv_writer = csv.writer(csv_file)
+            headers = ["Time [s]", "Temperature [C]"]
+            csv_writer.writerow(headers)
+
+            for time, temperature in zip(time_values, temperature_values):
+                csv_writer.writerow([time, temperature])
 
     def get_materials_from_csv_file(self):
         """
@@ -374,6 +399,10 @@ class GraphView(tk.Frame):
             self.run_button["bd"] = 2
             self.pause_button["bd"] = 20
             self.stop_button["bd"] = 2
+
+            # Saving the current results to CSV and PNG files
+            self.save_results_to_csv_file(self.Sim.t[1:], self.MyCallBack.TempHistoryAtPoint_x0, self.chosen_material, "NumericalForward")
+            self.save_results_to_png_file(self.temperature_figure, self.MyCallBack.TempHistoryAtPoint_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
 
     def stop_button_action(self):
         """
@@ -481,14 +510,20 @@ class GraphView(tk.Frame):
             - with the lambda function in after() it is possible to input
               parameters into the self-calling function
         """
+        # What to do at the very end of the simulation
         if self.Sim.t[-1] >= self.t_stop:
             self.run_button["bd"] = 2
             self.simulation_state = "finished"
             self.dt = None # Setting the value back to undefined, to be udpated the next run
             self.dt_value_input["state"] = "normal" # Allowing to modify the dt input again
 
+            # Calculating and displaying the error value
             ErrorNorm = np.sum(abs(self.MyCallBack.TempHistoryAtPoint_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])  # average temperature error
             self.display_error_value(ErrorNorm)
+
+            # Saving the results to the CSV and PGN files
+            self.save_results_to_csv_file(self.Sim.t[1:], self.MyCallBack.TempHistoryAtPoint_x0, self.chosen_material, "NumericalForward")
+            self.save_results_to_png_file(self.temperature_figure, self.MyCallBack.TempHistoryAtPoint_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
 
         iter = 0
         max_loop_iter = 20

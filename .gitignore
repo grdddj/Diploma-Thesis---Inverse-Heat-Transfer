@@ -1,5 +1,6 @@
 dist
 build
+trial
 __pycache__
-results.csv
-experiment_results.csv
+*.csv
+*.png
