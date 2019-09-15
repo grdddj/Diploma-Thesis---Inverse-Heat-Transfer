@@ -114,27 +114,21 @@ class NewCallback:
     Callback that is being applied to the simulation to draw data in real
         time about the calculation.
     """
-    def __init__(self, Call_at=100.0, x0=0, ExperimentData=None):
+    def __init__(self, Call_at=200.0, x0=0, ExperimentData=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
-        self.x0 = x0  # x positinon of the temperature we are interested in
-        self.TempHistoryAtPoint_x0 = []  # We can be saving data of temperature from specific point in space (x0)
         self.ExperimentData = ExperimentData
 
     def Call(self, Sim):
         """
 
         """
-        # https://docs.scipy.org/doc/numpy/reference/generated/numpy.interp.html
-        self.TempHistoryAtPoint_x0.append(np.interp(self.x0, Sim.x, Sim.T))  # interpolate temperature value at position x0 from point around and save it
         # Update the time calculation is in progress
         app.frames[GraphView].update_elapsed_time()
         if Sim.t[-1] > self.last_call + self.Call_at:  # if it is time to comunicate with GUI then show something
 
             # Refreshing the graph with all the new time and temperature values
-            app.frames[GraphView].refresh_graph_with_new_values(Sim.t[1:], self.TempHistoryAtPoint_x0, self.ExperimentData[0], self.ExperimentData[1])
-
-            print(f"Temperature at x0: {self.TempHistoryAtPoint_x0[-1]} at time {Sim.t[-1]} flux: {Sim.HeatFlux(Sim.t[-1])}")
+            app.frames[GraphView].refresh_graph_with_new_values(Sim.t[1:], Sim.T_x0, self.ExperimentData[0], self.ExperimentData[1])
             self.last_call += self.Call_at
 
         return True
@@ -449,8 +443,8 @@ class GraphView(tk.Frame):
             self.stop_button["bd"] = 2
 
             # Saving the current results to CSV and PNG files
-            self.save_results_to_csv_file(self.Sim.t[1:], self.MyCallBack.TempHistoryAtPoint_x0, self.chosen_material, "NumericalForward")
-            self.save_results_to_png_file(self.temperature_figure, self.MyCallBack.TempHistoryAtPoint_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
+            self.save_results_to_csv_file(self.Sim.t[1:], self.Sim.T_x0, self.chosen_material, "NumericalForward")
+            self.save_results_to_png_file(self.temperature_figure, self.Sim.T_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
 
     def stop_button_action(self):
         """
@@ -467,8 +461,8 @@ class GraphView(tk.Frame):
                 parameter["input_name"]["state"] = "normal"
 
             # Saving the current results to CSV and PNG files
-            self.save_results_to_csv_file(self.Sim.t[1:], self.MyCallBack.TempHistoryAtPoint_x0, self.chosen_material, "NumericalForward")
-            self.save_results_to_png_file(self.temperature_figure, self.MyCallBack.TempHistoryAtPoint_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
+            self.save_results_to_csv_file(self.Sim.t[1:], self.Sim.T_x0, self.chosen_material, "NumericalForward")
+            self.save_results_to_png_file(self.temperature_figure, self.Sim.T_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
 
     def show_message_to_the_user(self, message):
         """
@@ -591,8 +585,15 @@ class GraphView(tk.Frame):
 
         # This  is how the experiment recorded in DATA.csv was aproximately done
         my_material = Material(rho, cp, lmbd)
-        self.Sim = Simulation(Length=self.object_length, Material=my_material, N=self.number_of_elements, HeatFlux=test_q, AmbientTemperature=T_amb, RobinAlpha=13.5)
-        self.MyCallBack = NewCallback(x0=self.place_of_interest, ExperimentData=(t_data, T_data))
+        self.Sim = Simulation(Length=self.object_length,
+                              Material=my_material,
+                              N=self.number_of_elements,
+                              HeatFlux=test_q,
+                              AmbientTemperature=T_amb,
+                              RobinAlpha=13.5,
+                              x0=self.place_of_interest)
+
+        self.MyCallBack = NewCallback(ExperimentData=(t_data, T_data))
         self.t_start = t_data[0]
         self.t_stop = t_data[-1]-1
         self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
@@ -610,7 +611,12 @@ class GraphView(tk.Frame):
             to have them as inputs to the function, or instance variables
             - with the lambda function in after() it is possible to input
               parameters into the self-calling function
+
+        OPINION: I would make them instance variables.
+                 I do not see what would be appropriate to pass between calls like that.
+                 If that changes I would use self.something...
         """
+
         # What to do at the very end of the simulation
         if self.Sim.t[-1] >= self.t_stop:
             self.run_button["bd"] = 2
@@ -621,28 +627,26 @@ class GraphView(tk.Frame):
                 parameter["input_name"]["state"] = "normal"
 
             # Calculating and displaying the error value
-            ErrorNorm = np.sum(abs(self.MyCallBack.TempHistoryAtPoint_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])  # average temperature error
+            ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])  # average temperature error
             self.display_error_value(ErrorNorm)
 
             # Saving the results to the CSV and PGN files
-            self.save_results_to_csv_file(self.Sim.t[1:], self.MyCallBack.TempHistoryAtPoint_x0, self.chosen_material, "NumericalForward")
-            self.save_results_to_png_file(self.temperature_figure, self.MyCallBack.TempHistoryAtPoint_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
+            self.save_results_to_csv_file(self.Sim.t[1:], self.Sim.T_x0, self.chosen_material, "NumericalForward")
+            self.save_results_to_png_file(self.temperature_figure, self.Sim.T_x0[0], self.Sim.t[-1], self.chosen_material, "NumericalForward")
 
         iter = 0
-        max_loop_iter = 20
+        max_loop_iter = 30
         # enter the loop temporarily and hand the control back to the GUI afterwards
         while self.Sim.t[-1] < self.t_stop and iter <= max_loop_iter:
             dt = min(self.dt, self.t_stop-self.Sim.t[-1])  # checking if not surpassing t_stop
-            self.Sim.T = EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
-            self.Sim.T_record.append(self.Sim.T)  # push it to designated list
-            self.Sim.t.append(self.Sim.t[-1] + dt)  # push time step to its list
+            EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
             self.MyCallBack.Call(self.Sim)
             iter += 1
 
         if self.simulation_state == "running":
             # https://stackoverflow.com/questions/29158220/tkinter-understanding-mainloop
             # Calls itself after 3ms (this might get it laggy if too low) so other stuff can happen in the app.mainloop in those 3ms
-            self.after(1, lambda: self.make_sim_step())
+            self.after(1, self.make_sim_step)
 
 if __name__ == '__main__':
     app = HeatTransfer()

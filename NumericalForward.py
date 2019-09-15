@@ -62,13 +62,15 @@ Steel = Material(7850, 520, 50)
 
 # here we do the finite element method magic and define some placeholders to handle stuff
 class Simulation:  # In later objects abreviated as Sim
-    def __init__(self, Length=1, Material=Steel, N=10, HeatFlux=Default_HeatFlux, AmbientTemperature=Default_AmbientTemperature, RobinAlpha=10):
+    def __init__(self, Length=1, Material=Steel, N=10, HeatFlux=Default_HeatFlux, AmbientTemperature=Default_AmbientTemperature, RobinAlpha=10, x0=0.5):
         self.L = Length  # length (thisckness of one-dimensional wall)
         self.Mat = Material  # material data
         self.N = int(N)  # number of elements in the model
         #  https://docs.scipy.org/doc/numpy/reference/generated/numpy.empty.html
         self.T = np.empty(N+1)  # placeholder for actual temperatures in last evaluated step
         self.T_record = []  # Placeholder for the temperature history (list of numpy arrays)
+        self.T_x0 = []  # Placeholder for temperature probes data
+        self.x0 = x0  # Placeholder for temperature probes positions
         self.HeatFlux = HeatFlux  # Placeholder for heat flux at boundary (callable function)
         self.RobinAlpha = RobinAlpha  # constant coeficient of heat transfer for the right boundary (Robin's boundary condition)
         self.T_amb = AmbientTemperature  # ambient temperature callable function
@@ -91,6 +93,25 @@ class Simulation:  # In later objects abreviated as Sim
         self.K[0,0] /= 2  # Here we will push Heat to the body - Neumann Boundary Condition
         self.K[N,N] /= 2  # Here we know the body is in contact with air so it will cool accordingly - Robin Boundary Condition
 
+        self.checkpoints = []  # In the Inverse problem we will need to revert to previous simulation states
+
+        def make_checkpoint(self, new=False):
+            if new or len(self.checkpoints) == 0:
+                self.checkpoints.append({"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t})
+            else:
+                self.checkpoints[-1] = {"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t}
+
+        def revert_to_checkpoint(self, revert_by=1, remove_checkpoints=False):
+            if len(self.checkpoints) != 0:
+                self.T = self.checkpoints[-revert_by]["T"]
+                self.T_record = self.checkpoints[-revert_by]["T_record"]
+                self.t = self.checkpoints[-revert_by]["t"]
+                self.T_x0 = self.checkpoints[-revert_by]["T_x0"]
+                if remove_checkpoints:
+                    self.checkpoints.pop(range(-revert_by,-1))
+            else:
+                print("Specified checkpoint not available. Skiping...")
+
 # Function that calculates new timestep (Again do not worry about math right now, that will come later)
 # theta is value between 0.0 and 1.0 (float) which gradualy mutates the method from fully explicit (0.0) to fully implicit (1.0)
 # so we have a lot of methods packed in one function
@@ -110,7 +131,11 @@ def EvaluateNewStep(Sim, dt, theta):
     b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
 
     # solve the equation A*Sim.T=b
-    return spsolve(A, b)  # solve Sim.T for the new step k
+    Sim.T = spsolve(A, b)  # solve Sim.T for the new step k
+    Sim.T_record.append(Sim.T)  # push it to designated list
+    Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+    Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes
+    # TODO: use this T_x0 rather than the CallBack version
 
 # This is quite dumm callback, but I guess you are going to change this part a lot
 # In forward simulation there perhaps does not have to be callback at all
@@ -145,11 +170,7 @@ def ForwardSimulation(Sim, theta=0.5, T0=0, dt=0.01, t_start=0, t_stop=100, Call
     Sim.T_record.append(Sim.T)  # save initial step
     # main simulation loop (no time step adatpation yet - but it can be done later, it would make it even faster and more awesome)
     while Sim.t[-1] < t_stop:
-        Sim.T = EvaluateNewStep(Sim, dt, theta)  # evaluate Temperaures at step k
-        Sim.T_record.append(Sim.T)  # push it to designated list
-        Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+        EvaluateNewStep(Sim, dt, theta)  # evaluate Temperaures at step k
         if CallBack is not None:
             # Do whatever the callback needs to do and stopping the simulation
-            #   if the callback returns False
-            if not CallBack.Call(Sim):
-                break
+            CallBack.Call(Sim)
