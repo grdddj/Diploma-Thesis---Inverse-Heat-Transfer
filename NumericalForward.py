@@ -95,22 +95,22 @@ class Simulation:  # In later objects abreviated as Sim
 
         self.checkpoints = []  # In the Inverse problem we will need to revert to previous simulation states
 
-        def make_checkpoint(self, new=False):
-            if new or len(self.checkpoints) == 0:
-                self.checkpoints.append({"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t})
-            else:
-                self.checkpoints[-1] = {"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t}
+    def make_checkpoint(self, new=False):
+        if new or len(self.checkpoints) == 0:
+            self.checkpoints.append({"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t})
+        else:
+            self.checkpoints[-1] = {"T": self.T, "T_record": self.T_record, "T_x0": self.T_x0, "t": self.t}
 
-        def revert_to_checkpoint(self, revert_by=1, remove_checkpoints=False):
-            if len(self.checkpoints) != 0:
-                self.T = self.checkpoints[-revert_by]["T"]
-                self.T_record = self.checkpoints[-revert_by]["T_record"]
-                self.t = self.checkpoints[-revert_by]["t"]
-                self.T_x0 = self.checkpoints[-revert_by]["T_x0"]
-                if remove_checkpoints:
-                    self.checkpoints.pop(range(-revert_by,-1))
-            else:
-                print("Specified checkpoint not available. Skiping...")
+    def revert_to_checkpoint(self, revert_by=1, remove_checkpoints=False):
+        if len(self.checkpoints) != 0:
+            self.T = self.checkpoints[-revert_by]["T"]
+            self.T_record = self.checkpoints[-revert_by]["T_record"]
+            self.t = self.checkpoints[-revert_by]["t"]
+            self.T_x0 = self.checkpoints[-revert_by]["T_x0"]
+            if remove_checkpoints:
+                self.checkpoints.pop(range(-revert_by,-1))
+        else:
+            print("Specified checkpoint not available. Skiping...")
 
 # Function that calculates new timestep (Again do not worry about math right now, that will come later)
 # theta is value between 0.0 and 1.0 (float) which gradualy mutates the method from fully explicit (0.0) to fully implicit (1.0)
