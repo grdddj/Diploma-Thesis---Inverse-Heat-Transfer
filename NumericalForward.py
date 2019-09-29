@@ -9,6 +9,10 @@ from scipy.sparse.linalg import spsolve    # this guy can solve equation faster 
 import scipy.interpolate as interpolate  # well this guy is quite obvious
 import matplotlib.pyplot as plt  # some ploting backend - but you can change to whatever you need
 
+# Used to deepcopy matrixes and arrays, so that the new copy can be modified
+#   without changing the original one
+from copy import deepcopy
+
 def Default_HeatFlux(t):
     return 1e5*np.sin(2*np.pi*t*(1/10))
     # QUESTION: This is just an arbitrary value?
@@ -93,6 +97,14 @@ class Simulation:  # In later objects abreviated as Sim
         self.K[0,0] /= 2  # Here we will push Heat to the body - Neumann Boundary Condition
         self.K[N,N] /= 2  # Here we know the body is in contact with air so it will cool accordingly - Robin Boundary Condition
 
+        # Preparing variables to store the values of some properties, that are
+        #   likely to stay the same for the whole script - so we are not
+        #   recalculating them each time.
+        self.A_default = None
+        self.b_first_part_default = None
+        self.current_dt = None
+        self.current_theta = None
+
         self.checkpoints = []  # In the Inverse problem we will need to revert to previous simulation states
 
     def make_checkpoint(self, new=False):
@@ -116,8 +128,22 @@ class Simulation:  # In later objects abreviated as Sim
 # theta is value between 0.0 and 1.0 (float) which gradualy mutates the method from fully explicit (0.0) to fully implicit (1.0)
 # so we have a lot of methods packed in one function
 def EvaluateNewStep(Sim, dt, theta):
-    A = Sim.M + dt*theta*Sim.K  # assemble sparse matrix A from the K and M (see in above class what they are)
-    b = (Sim.M - dt*(1-theta)*Sim.K).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+    # When there was a change in dt or theta from the previous call, there is
+    #   a need to recalculate values of A_default and b_first_part_default
+    # NOTE: This will also be run at the very first call, because the values
+    #   of Sim.current_dt and Sim.current_theta are None at the beginning
+    if dt != Sim.current_dt or theta != Sim.current_theta:
+        Sim.A_default = Sim.M + dt*theta*Sim.K
+        Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
+        Sim.current_dt = dt
+        Sim.current_theta = theta
+
+    # Cloning and calculating the current A and b values
+    # NOTE: There is a need of deep-copying each time, just referencing it
+    #   would be incorrect, because we would be changing the default A and b
+    #   in place, and it should stay the same for each call of this function
+    A = deepcopy(Sim.A_default) # assemble sparse matrix A from the K and M (see in above class what they are)
+    b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
 
     # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
     b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux
