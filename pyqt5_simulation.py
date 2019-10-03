@@ -1,33 +1,34 @@
 """
-This (dirty) module is supposed to offer performance testing of the algorithms
-    we use.
-It's supposed use is to try improvements in NumericalForward, which is being
-    imported here, run this script, and observe the output in the terminal
-    and in the generated .txt file.
-This way we can track the improvements through the time, and quickly
-    experiment with new things.
-After completion, NumericalInverse could be tested with a similar way.
+This module is preparing simulation for the PyQT5 GUI.
+Theoretically it can be used anywhere, because it just takes an arbitrary plot,
+    and calls it's plot() method with the calculated data.
 """
 
 from NumericalForward import *
 import csv
 import time
 import os
+import threading
 
 class NewCallback:
     """
     """
-    def __init__(self, Call_at=200.0, x0=0, ExperimentData=None):
+    def __init__(self, Call_at=200.0, x0=0, ExperimentData=None, plot_to_update=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
         self.ExperimentData = ExperimentData
+        # Takes reference of some plot, which it should update
+        self.plot_to_update = plot_to_update
 
     def Call(self, Sim):
         """
         """
         # Update the time calculation is in progress
         if Sim.t[-1] > self.last_call + self.Call_at:  # if it is time to comunicate with GUI then show something
-            # print(Sim.t[-1])
+            if self.plot_to_update is not None:
+                self.plot_to_update.plot(Sim.t[1:],Sim.T_x0)
+
+            # self.plot_to_update.plot()
             # Refreshing the graph with all the new time and temperature values
             self.last_call += self.Call_at
 
@@ -37,7 +38,7 @@ class Trial():
     """
     """
 
-    def PrepareSimulation(self):
+    def PrepareSimulation(self, plot):
         """
         """
         t_data = []  # experimental data of time points
@@ -70,7 +71,7 @@ class Trial():
                               RobinAlpha=13.5,
                               x0=self.place_of_interest)
 
-        self.MyCallBack = NewCallback()
+        self.MyCallBack = NewCallback(plot_to_update=plot)
         self.t_start = t_data[0]
         self.t_stop = t_data[-1]-1
         self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
@@ -93,12 +94,11 @@ class Trial():
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
 
-
-if __name__ == '__main__':
+def run_test(plot=None, progress_callback=None, amount_of_trials=1):
     app = Trial()
 
     # The description of tested scenario, what was changed etc.
-    SCENARIO_DESCRIPTION = "Trial"
+    SCENARIO_DESCRIPTION = "pyqt5"
 
     app.rho = 7850
     app.cp = 520
@@ -109,19 +109,20 @@ if __name__ == '__main__':
     app.place_of_interest = 0.0045
     app.number_of_elements = 100
 
-    amount_of_trials = 10
-
     now = time.time()
 
     # Running the simulation for specific amount of trials
-    for _ in range(amount_of_trials):
+    for i in range(amount_of_trials):
+        print("Current thread: {}".format(threading.currentThread().getName()))
+
         x = time.time()
-        app.PrepareSimulation()
+        app.PrepareSimulation(plot)
         y = time.time()
         print("PrepareSimulation: {}".format(round(y - x, 3)))
         app.make_sim_step()
         z = time.time()
         print("make_sim_step: {}".format(round(z - y, 3)))
+        # progress_callback.emit("ggf")
 
     print(80*"*")
 
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
     directory_for_results = os.path.join(WORKING_DIRECTORY, 'Performance')
     if not os.path.isdir(directory_for_results):
-       os.mkdir(directory_for_results)
+        os.mkdir(directory_for_results)
 
     # Getting the file appropriate name
     file_name = "{}/{}s-{}e-{}.txt".format(directory_for_results, average_loop_time, app.ErrorNorm, SCENARIO_DESCRIPTION)
@@ -150,3 +151,10 @@ if __name__ == '__main__':
         file.write("loop_amount: {}\n".format(app.loop_amount))
         file.write("dt: {}\n".format(app.dt))
         file.write("ErrorNorm: {}\n".format(app.ErrorNorm))
+
+
+    return "I am finally freee!"
+
+
+if __name__ == '__main__':
+    run_test(amount_of_trials=5)
