@@ -1,0 +1,65 @@
+I was curious about the performance of individual operations, so I did the
+  profiling with the line_profiler (kernprof) module, which I highly recommend.
+Installation:
+  pip3 install line_profiler
+  (I had to use conda install line_profiler because of some issues)
+Use:
+  Placing "@profile" decorator above the function we want to test
+  kernprof -lv script.py
+
+The main focus was on analysing EvaluateNewStep(), as it is the vital function
+  that is eating the most time.
+
+The results were quite suprising - the whole profiling can be seen below.
+
+The consumption of 30 % time just by modifying one element in a matrix
+  is ridiculous in my opinion - it takes two times more time than to
+  solve the whole linear equation later.
+
+I tried to find out something about modifying scipy sparse matrixes, but was
+  not successful yet.
+
+Other possibility I was researching was using numba, which offers some
+  very interesting speed improvements with using compilation.
+However, it is designed only for numpy data structures, and therefore it
+  is incompatible with out scipy constructs.
+I looked at constructing tridiagonal matrixes in numpy, but did not find anything.
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   133                                           @profile
+   134                                           def EvaluateNewStep(Sim, dt, theta):
+   135                                               # When there was a change in dt or theta from the previous call, there is
+   136                                               #   a need to recalculate values of A_default and b_first_part_default
+   137                                               # NOTE: This will also be run at the very first call, because the values
+   138                                               #   of Sim.current_dt and Sim.current_theta are None at the beginning
+   139      4833      57065.0     11.8      0.1      if dt != Sim.current_dt or theta != Sim.current_theta:
+   140         2      10160.0   5080.0      0.0          Sim.A_default = Sim.M + dt*theta*Sim.K
+   141         2       9024.0   4512.0      0.0          Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
+   142         2         24.0     12.0      0.0          Sim.current_dt = dt
+   143         2         13.0      6.5      0.0          Sim.current_theta = theta
+   144
+   145                                               # Cloning and calculating the current A and b values
+   146                                               # NOTE: There is a need of deep-copying each time, just referencing it
+   147                                               #   would be incorrect, because we would be changing the default A and b
+   148                                               #   in place, and it should stay the same for each call of this function
+   149      4833    6638819.0   1373.6     13.9      A = deepcopy(Sim.A_default) # assemble sparse matrix A from the K and M (see in above class what they are)
+   150      4833    7021914.0   1452.9     14.7      b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+   151
+   152                                               # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
+   153      4833    3120055.0    645.6      6.5      b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux
+   154      4833    2454396.0    507.8      5.1      b[0] += dt*theta*Sim.HeatFlux(Sim.t[-1] + dt)  # from step k - implicit portion of HeatFlux
+   155
+   156                                               # apply Robin Boundary Condition - telling it how much it cools down because of the air on the other side
+   157                                               # you surely know the equation alpha*(T_body - T_amb) for convective heat trasfer - that what is it doing here
+   158      4833     140465.0     29.1      0.3      b[-1] -= dt*(1-theta)*Sim.RobinAlpha*Sim.T[-1]  # from step k-1 - explicit portion of T_body contribution
+   159      4833   14605281.0   3022.0     30.6      A[-1,-1] += dt*theta*Sim.RobinAlpha  # from step k - implicit portion of T_body contribution
+   160      4833    2926383.0    605.5      6.1      b[-1] += dt*(1-theta)*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1])  # from step k-1 - explicit portion of T_amb contribution
+   161      4833    2415979.0    499.9      5.1      b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
+   162
+   163                                               # solve the equation A*Sim.T=b
+   164      4833    7667452.0   1586.5     16.1      Sim.T = spsolve(A, b)  # solve Sim.T for the new step k
+   165      4833      82461.0     17.1      0.2      Sim.T_record.append(Sim.T)  # push it to designated list
+   166      4833      69768.0     14.4      0.1      Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+   167      4833     505454.0    104.6      1.1      Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes
