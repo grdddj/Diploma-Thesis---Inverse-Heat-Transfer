@@ -7,6 +7,10 @@ It's supposed use is to try improvements in NumericalForward, which is being
 This way we can track the improvements through the time, and quickly
     experiment with new things.
 After completion, NumericalInverse could be tested with a similar way.
+
+RESULTS WORTH NOTING:
+- After implementing the default A and b, the time dropped from 5,5 to 3,5 seconds
+    (in a scenario without ever changing dt or theta, so no recalculating)
 """
 
 from NumericalForward import *
@@ -109,7 +113,7 @@ if __name__ == '__main__':
     app.place_of_interest = 0.0045
     app.number_of_elements = 100
 
-    amount_of_trials = 10
+    amount_of_trials = 3
 
     now = time.time()
 

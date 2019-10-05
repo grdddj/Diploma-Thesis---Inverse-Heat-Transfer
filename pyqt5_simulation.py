@@ -2,6 +2,14 @@
 This module is preparing simulation for the PyQT5 GUI.
 Theoretically it can be used anywhere, because it just takes an arbitrary plot,
     and calls it's plot() method with the calculated data.
+
+It is now written to support connection with PySide2 GUI in the sense of:
+    a) the plot which to update
+    b) the queue which to communicate over
+However, it can still be used as a standalone module, because we are using
+    these connections only when they are set up (are not None)
+Therefore it can still be used as a performance tracker, or as a simulation
+    module to whatever other GUI will connect to it
 """
 
 from NumericalForward import *
@@ -13,12 +21,19 @@ import threading
 class NewCallback:
     """
     """
-    def __init__(self, Call_at=200.0, x0=0, ExperimentData=None, plot_to_update=None):
+    def __init__(self, Call_at=200.0, x0=0, ExperimentData=None, plot_to_update=None, queue=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
         self.ExperimentData = ExperimentData
-        # Takes reference of some plot, which it should update
+
+        # Takes reference of some plot, which it should update, and some queue,
+        #   through which the GUI will send information
         self.plot_to_update = plot_to_update
+        self.queue = queue
+
+        # Setting the starting simulation state as "running" - this can be changed
+        #   only through the queue by input from GUI
+        self.simulation_state = "running"
 
     def Call(self, Sim):
         """
@@ -28,17 +43,35 @@ class NewCallback:
             if self.plot_to_update is not None:
                 self.plot_to_update.plot(Sim.t[1:],Sim.T_x0)
 
-            # self.plot_to_update.plot()
-            # Refreshing the graph with all the new time and temperature values
             self.last_call += self.Call_at
 
-        return True
+        # TODO: decide how often to read the queue (look if it does not affect performance a lot)
+        if self.queue is not None:
+            # Try to get last item from the queue sent from GUI
+            try:
+                msg = self.queue.get_nowait()
+                print(msg)
+
+                # This may seem redundant, but we are guarding against some
+                #   unkown msg
+                if msg == "stop":
+                    self.simulation_state = "stopped"
+                elif msg == "pause":
+                    self.simulation_state = "paused"
+                elif msg == "continue":
+                    self.simulation_state = "running"
+            # TODO: handle this properly
+            except:
+                pass
+
+        # Returning the current ismulation state to be handled by make_sim_step()
+        return self.simulation_state
 
 class Trial():
     """
     """
 
-    def PrepareSimulation(self, plot):
+    def PrepareSimulation(self, plot, queue):
         """
         """
         t_data = []  # experimental data of time points
@@ -71,7 +104,7 @@ class Trial():
                               RobinAlpha=13.5,
                               x0=self.place_of_interest)
 
-        self.MyCallBack = NewCallback(plot_to_update=plot)
+        self.MyCallBack = NewCallback(plot_to_update=plot, queue=queue)
         self.t_start = t_data[0]
         self.t_stop = t_data[-1]-1
         self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
@@ -85,20 +118,28 @@ class Trial():
         """
         self.loop_amount = 0
         while self.Sim.t[-1] < self.t_stop:
-            dt = min(self.dt, self.t_stop-self.Sim.t[-1])  # checking if not surpassing t_stop
-            EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
-            self.MyCallBack.Call(self.Sim)
-            self.loop_amount += 1
+            # Processing the callback and getting the simulation state at the same time
+            # Then acting accordingly to the current state
+            simulation_state = self.MyCallBack.Call(self.Sim)
+            if simulation_state == "running":
+                dt = min(self.dt, self.t_stop-self.Sim.t[-1])  # checking if not surpassing t_stop
+                EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
+                self.loop_amount += 1
+            elif simulation_state == "paused":
+                time.sleep(0.1)
+            elif simulation_state == "stopped":
+                print("stopping")
+                break
 
         self.ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
 
-def run_test(plot=None, progress_callback=None, amount_of_trials=1):
+def run_test(plot=None, progress_callback=None, amount_of_trials=1, queue=None):
     app = Trial()
 
     # The description of tested scenario, what was changed etc.
-    SCENARIO_DESCRIPTION = "pyqt5"
+    SCENARIO_DESCRIPTION = "PySide2"
 
     app.rho = 7850
     app.cp = 520
@@ -116,7 +157,7 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1):
         print("Current thread: {}".format(threading.currentThread().getName()))
 
         x = time.time()
-        app.PrepareSimulation(plot)
+        app.PrepareSimulation(plot, queue)
         y = time.time()
         print("PrepareSimulation: {}".format(round(y - x, 3)))
         app.make_sim_step()

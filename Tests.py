@@ -665,4 +665,6 @@ if __name__ == '__main__':
     else:
         app.state("zoomed")  # Windows and MacOS
 
+    app.bind('<Escape>', quit)
+
     app.mainloop()
