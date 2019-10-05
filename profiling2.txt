@@ -1,0 +1,47 @@
+While searching for a solution of how to increase the speed of modifying one
+  element of scipy sparse matrix, which was costing 30 % of the function time,
+  I noticed we are modifying this one element the same way each loop.
+  (Considering the values of dt and theta are cosntant)
+Then just a simple transfer of this calculation into the default value of A
+  was enough to completely get rid of this big time overhead it was causing.
+
+Time profiling of EvaluateNewStep() now looks as follows:
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   130                                           @profile
+   131                                           def EvaluateNewStep(Sim, dt, theta):
+   132                                               # When there was a change in dt or theta from the previous call, there is
+   133                                               #   a need to recalculate values of A_default and b_first_part_default
+   134                                               # NOTE: This will also be run at the very first call, because the values
+   135                                               #   of Sim.current_dt and Sim.current_theta are None at the beginning
+   136      4833      56298.0     11.6      0.2      if dt != Sim.current_dt or theta != Sim.current_theta:
+   137         2      12542.0   6271.0      0.0          Sim.A_default = Sim.M + dt*theta*Sim.K
+   138         2       8437.0   4218.5      0.0          Sim.A_default[-1,-1] += dt*theta*Sim.RobinAlpha
+   139         2      11015.0   5507.5      0.0          Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
+   140         2         31.0     15.5      0.0          Sim.current_dt = dt
+   141         2         15.0      7.5      0.0          Sim.current_theta = theta
+   142
+   143                                               # Cloning and calculating the current A and b values
+   144                                               # NOTE: There is a need of deep-copying each time, just referencing it
+   145                                               #   would be incorrect, because we would be changing the default A and b
+   146                                               #   in place, and it should stay the same for each call of this function
+   147      4833    6871240.0   1421.7     21.5      A = deepcopy(Sim.A_default) # assemble sparse matrix A from the K and M (see in above class what they are)
+   148      4833    6869300.0   1421.3     21.5      b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+   149
+   150                                               # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
+   151      4833    3033780.0    627.7      9.5      b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux
+   152      4833    2430871.0    503.0      7.6      b[0] += dt*theta*Sim.HeatFlux(Sim.t[-1] + dt)  # from step k - implicit portion of HeatFlux
+   153
+   154                                               # apply Robin Boundary Condition - telling it how much it cools down because of the air on the other side
+   155                                               # you surely know the equation alpha*(T_body - T_amb) for convective heat trasfer - that what is it doing here
+   156      4833     133715.0     27.7      0.4      b[-1] -= dt*(1-theta)*Sim.RobinAlpha*Sim.T[-1]  # from step k-1 - explicit portion of T_body contribution
+   157      4833    2307423.0    477.4      7.2      b[-1] += dt*(1-theta)*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1])  # from step k-1 - explicit portion of T_amb contribution
+   158      4833    2260921.0    467.8      7.1      b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
+   159
+   160                                               # solve the equation A*Sim.T=b
+   161      4833    7393968.0   1529.9     23.1      Sim.T = spsolve(A, b)  # solve Sim.T for the new step k
+   162      4833      75946.0     15.7      0.2      Sim.T_record.append(Sim.T)  # push it to designated list
+   163      4833      67877.0     14.0      0.2      Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+   164      4833     484077.0    100.2      1.5      Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes

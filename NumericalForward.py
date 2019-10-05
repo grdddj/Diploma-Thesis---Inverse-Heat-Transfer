@@ -134,6 +134,7 @@ def EvaluateNewStep(Sim, dt, theta):
     #   of Sim.current_dt and Sim.current_theta are None at the beginning
     if dt != Sim.current_dt or theta != Sim.current_theta:
         Sim.A_default = Sim.M + dt*theta*Sim.K
+        Sim.A_default[-1,-1] += dt*theta*Sim.RobinAlpha # Precalculating the implicit portion of T_body contribution
         Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
         Sim.current_dt = dt
         Sim.current_theta = theta
@@ -152,7 +153,8 @@ def EvaluateNewStep(Sim, dt, theta):
     # apply Robin Boundary Condition - telling it how much it cools down because of the air on the other side
     # you surely know the equation alpha*(T_body - T_amb) for convective heat trasfer - that what is it doing here
     b[-1] -= dt*(1-theta)*Sim.RobinAlpha*Sim.T[-1]  # from step k-1 - explicit portion of T_body contribution
-    A[-1,-1] += dt*theta*Sim.RobinAlpha  # from step k - implicit portion of T_body contribution
+    # NOTE: "from step k - implicit portion of T_body contribution" moved to a default value,
+    #       because it was still repeating the same calculation (considering constant dt and theta)
     b[-1] += dt*(1-theta)*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1])  # from step k-1 - explicit portion of T_amb contribution
     b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
 
