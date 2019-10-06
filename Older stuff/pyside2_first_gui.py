@@ -23,7 +23,6 @@ import queue
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 import traceback, sys
 import time
@@ -43,7 +42,7 @@ os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugin_path
 def hello_world():
     print("HELLO WORLD")
 
-class App(QMainWindow):
+class HeatTransfer(QMainWindow):
 
     def __init__(self):
         super().__init__()
@@ -247,5 +246,8 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    ex = App()
+
+    heat_transfer = HeatTransfer()
+    heat_transfer.showMaximized()
+
     sys.exit(app.exec_())

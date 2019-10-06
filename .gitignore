@@ -2,7 +2,6 @@ dist
 build
 trial*
 __pycache__
-*.csv
 *.png
 *.exe
 Performance
