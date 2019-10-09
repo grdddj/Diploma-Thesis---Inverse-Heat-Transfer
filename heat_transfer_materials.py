@@ -31,9 +31,9 @@ class MaterialService:
                     name = row[0]
                     material_properties = {}
 
-                    material_properties["rho"] = row[2]
-                    material_properties["cp"] = row[3]
-                    material_properties["lmbd"] = row[4]
+                    material_properties["rho"] = int(row[2])
+                    material_properties["cp"] = int(row[3])
+                    material_properties["lmbd"] = int(row[4])
 
                     materials_dictionary[name] = material_properties
 

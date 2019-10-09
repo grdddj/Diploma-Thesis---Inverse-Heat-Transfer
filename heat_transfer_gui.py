@@ -32,16 +32,13 @@ Benefits of moving from TKinter to PyQt involve:
             if necessary, is certainly useful.
 
 TODOS:
-    - actually take the arguments from the user (not being done now)
-    - create a time counter from within the GUI loop, so that it is not
-         slowing down the simulation
+    - address the "error_value: nan" bug when simulation is "stopped" when not running
     - create a small window where to put important notices in the GUI
     - create some area where to show error messages to the user
         - or create a popup window with the same intent
     - create the saving of images and CSV files as a result
     - find out how to make the left arguments-menu not occupy the whole height
     - add documentation to classes and functions
-    - pick some naming convention for all files (like heat_transfer_***.py)
     - have an eye on speed - maybe it could even handle some multiprocessing
         - (or that FeniCS library)
     - think about more separation (Workers or PlotCanvas could deserve their own module)
@@ -74,23 +71,22 @@ TODOS FROM Tests.py:
 from PyQt5.uic import loadUiType
 from PyQt5 import QtWidgets, QtGui, QtCore
 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas,
-    NavigationToolbar2QT as NavigationToolbar)
-
 import sys
-import random
+import time
 
 import threading
 import queue
 
-import pyqt5_simulation
+import heat_transfer_simulation
 
-from material_service import MaterialService
+from heat_transfer_workers import Worker, WorkerSignals
+
+from heat_transfer_plot import PlotCanvas
+
+from heat_transfer_materials import MaterialService
 material_service = MaterialService()
 
-from user_input_service import UserInputService
+from heat_transfer_user_inputs import UserInputService
 user_input_service = UserInputService()
 
 # Creating the UI from the .ui template
@@ -105,6 +101,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, ):
         super(HeatTransferWindow, self).__init__()
         self.setupUi(self)
+        self.setWindowTitle("Heat transfer")
 
         self.add_material_choice()
         self.add_user_inputs()
@@ -112,7 +109,21 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         plot = PlotCanvas(self)
         self.plot_area_layout_2.addWidget(plot)
 
+        # Having access to the current state of the simulation
+        # Can be either "running", "paused", "stopped" or "finished"
         self.simulation_state = None
+
+        # Saving the material we are simulating right now
+        self.chosen_material = None
+
+        # Variables to keep user informed about the elapsed simulation time
+        # TODO: probably create an individual object for this
+        #       - also the logic could be maybe simplified
+        self.simulation_started_timestamp = 0
+        self.time_is_running = False
+        self.simulation_paused_timestamp = 0
+        self.time_spent_paused = 0
+        self.time_in_progress = 0
 
         self.threadpool = QtCore.QThreadPool()
         print("Multithreading with maximum {} threads".format(self.threadpool.maxThreadCount()))
@@ -143,21 +154,47 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             new_layout.addWidget(getattr(self, entry["input_name"]))
             self.verticalLayout.addLayout(new_layout)
 
+    def get_numbers_from_the_user_input(self):
+        """
+        Getting a list of number parameters from the user, according to the
+            passed list of input elements.
+        Depends on all the inputted elements to have a certain structure,
+            to be processed the right way.
+        """
+        list_of_values_to_return = []
+        for element in user_input_service.number_parameters_to_get_from_user:
+            try:
+                # Replacing comma with a dot (for those used to writing decimals places with a comma)
+                value_from_user = getattr(self, element["input_name"]).text().replace(",", ".")
+                parsed_value_from_user_in_SI = element["parse_function"](value_from_user) * element["multiplicate_to_SI"]
+            # If the value is still not parseable to specified type, make it a default value
+            #   and notify the user of it
+            except ValueError:
+                parsed_value_from_user_in_SI = element["default_value"] * element["multiplicate_to_SI"]
+                getattr(self, element["input_name"]).setText(str(element["default_value"]))
+                # self.show_message_to_the_user("ERROR: Your {} was not a valid number! We gave it a default of {} {}.".format(
+                #     element["name"], element["default_value"], element["unit"]))
+
+            list_of_values_to_return.append(parsed_value_from_user_in_SI)
+
+        return list_of_values_to_return
+
 
     def add_material_choice(self):
         """
 
         """
-        self.combo_box = QtWidgets.QComboBox()
-        self.combo_box.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
-        self.combo_box.addItems(material_service.materials_name_list)
+        self.material_combo_box = QtWidgets.QComboBox()
+        self.material_combo_box.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
+        self.material_combo_box.addItems(material_service.materials_name_list)
+        self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index('Iron'))
 
         new_layout = QtWidgets.QHBoxLayout()
         label = QtWidgets.QLabel("Material: ")
         label.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
         new_layout.addWidget(label)
 
-        new_layout.addWidget(self.combo_box)
+        new_layout.addWidget(self.material_combo_box)
         self.verticalLayout.addLayout(new_layout)
         # TODO: add a tooltip with information whenever the material is highlighted:
         #   https://www.tutorialspoint.com/pyqt/pyqt_qcombobox_widget.htm
@@ -167,6 +204,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         """
         print("SIMULATION FINISHED!!")
+        # Allowing all the fields for editing again
+        self.lock_inputs_for_editing(False)
+
         self.simulation_state = "finished"
 
     def pause_simulation(self):
@@ -202,16 +242,74 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.error_label.setText("ERROR:")
         print("RUNNING THE SIMULATION")
         queue.put("WE HAVE JUST BEGAN!")
+
+        # Getting current material from GUI and it's peoperties from the service
+        current_material = self.material_combo_box.currentText()
+        current_material_properties = (material_service.materials_properties_dict[current_material])
+
+        # Getting all other user input for the simulation
+        user_input = self.get_numbers_from_the_user_input()
+        dt, object_length, place_of_interest, number_of_elements = user_input
+
+        parameters = {
+            "rho": current_material_properties["rho"],
+            "cp": current_material_properties["cp"],
+            "lmbd": current_material_properties["lmbd"],
+            "dt": dt,
+            "object_length": object_length,
+            "place_of_interest": place_of_interest,
+            "number_of_elements": number_of_elements
+        }
+
+        self.lock_inputs_for_editing(True)
+
+        # Preparing all the time variables for the new simulation
+        # TODO: make it more precise with starting counting only as soon as
+        #       the simulation really starts
+        self.simulation_started_timestamp = time.time()
+        self.time_is_running = True
+        self.simulation_paused_timestamp = 0
+        self.time_spent_paused = 0
+        self.time_in_progress = 0
+
         # Pass the function to execute
-        worker = Worker(pyqt5_simulation.run_test, plot=plot, queue=queue, SCENARIO_DESCRIPTION="PyQt5_GUI")
+        worker = Worker(heat_transfer_simulation.run_test, plot=plot, queue=queue,
+                        parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
 
         # TODO: decide what to do with this (use it or delete it)
         worker.signals.result.connect(self.process_output)
         worker.signals.finished.connect(self.simulation_finished)
-        # worker.signals.progress.connect(self.new_progress)
+        worker.signals.progress.connect(self.update_simulation_time)
 
         # Execute
         self.threadpool.start(worker)
+
+    def update_simulation_time(self, simulation_state):
+        """
+        Keeping the user notified about the time the simulation is taking.
+        Is being called everytime the simulation will emit it's state.
+        Parameters:
+            simulation_state (int) Whether the simulation is running (1) or not (0)
+        """
+        now = time.time()
+
+        if simulation_state == 1:
+            # Handle transition from paused to running
+            if self.time_is_running == False:
+                self.time_is_running = True
+                self.time_spent_paused += now - self.simulation_paused_timestamp
+
+            # Update the label to show latest time
+            elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
+            self.time_label.setText("TIME: {} s".format(round(elapsed_time, 2)))
+        elif simulation_state == 0:
+            # Handle transition from running to paused, otherwise do nothing
+            if self.time_is_running == True:
+                self.time_is_running = False
+                self.simulation_paused_timestamp = now
+
+                elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
+                self.time_label.setText("TIME: {} s".format(round(elapsed_time, 2)))
 
     def process_output(self, returned_object):
         """
@@ -221,119 +319,19 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # TODO: create a function to change this error, and to colour it accordingly
         self.error_label.setText("ERROR: {}".format(returned_object["error_value"]))
 
-class PlotCanvas(FigureCanvas):
-    """
-
-    """
-    def __init__(self, parent=None, dpi=100):
-        fig = Figure(dpi=dpi)
-
-        FigureCanvas.__init__(self, fig)
-        self.setParent(parent)
-
-        FigureCanvas.setSizePolicy(self,
-                QtWidgets.QSizePolicy.Expanding,
-                QtWidgets.QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-
-        self.temperature_subplot = self.figure.add_subplot(111)
-
-        self.plot()
-
-    def plot(self, x_values=None, y_values=None,
-                   x_experiment_values=None, y_experiment_values=None):
+    def lock_inputs_for_editing(self, lock=True):
         """
-
+        Locks or unlocks all the user inputs.
+        Parameters:
+            lock  (bool) ... If the inputs should be locked (True)
+                             or unlocked (False)
         """
-        # TODO: make the plot at the beginning to say something, like "Press RUN"
-        if x_values is None:
-            x_values = [random.random() for i in range(25)]
-        if y_values is None:
-            y_values = [random.random() for i in range(25)]
-        self.temperature_subplot.cla()
-        self.temperature_subplot.set_title('Heat Transfer plot')
-        self.temperature_subplot.set_xlabel("Time [s]")
-        self.temperature_subplot.set_ylabel("Temperature [°C]")
+        # (UN)locking the number inputs
+        for element in user_input_service.number_parameters_to_get_from_user:
+            getattr(self, element["input_name"]).setReadOnly(lock)
 
-        self.temperature_subplot.plot(x_values, y_values, label='Calculated Data')
-        if x_experiment_values is not None and y_experiment_values is not None:
-            self.temperature_subplot.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
-
-
-        self.temperature_subplot.legend()
-        self.draw()
-
-class WorkerSignals(QtCore.QObject):
-    '''
-    Defines the signals available from a running worker thread.
-
-    Supported signals are:
-
-    finished
-        No data
-
-    error
-        `tuple` (exctype, value, traceback.format_exc() )
-
-    result
-        `object` data returned from processing, anything
-
-    progress
-        `int` indicating % progress
-
-    '''
-    # TODO: decide what to do with this (use it or delete it)
-    finished = QtCore.Signal()
-    error = QtCore.Signal(tuple)
-    result = QtCore.Signal(object)
-    progress = QtCore.Signal(int)
-
-
-class Worker(QtCore.QRunnable):
-    '''
-    Worker thread
-
-    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
-
-    :param callback: The function callback to run on this worker thread. Supplied args and
-                     kwargs will be passed through to the runner.
-    :type callback: function
-    :param args: Arguments to pass to the callback function
-    :param kwargs: Keywords to pass to the callback function
-
-    '''
-
-    def __init__(self, fn, *args, **kwargs):
-        super(Worker, self).__init__()
-
-        # Store constructor arguments (re-used for processing)
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-
-        # TODO: decide what to do with this (use it or delete it)
-        self.signals = WorkerSignals()
-        # Add the callback to our kwargs
-        self.kwargs['progress_callback'] = self.signals.progress
-
-    @QtCore.Slot()
-    def run(self):
-        '''
-        Initialise the runner function with passed args, kwargs.
-        '''
-
-        # Retrieve args/kwargs here; and fire processing using them
-        try:
-            result = self.fn(*self.args, **self.kwargs)
-        except:
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
-        else:
-            self.signals.result.emit(result)  # Return the result of the processing
-        finally:
-            self.signals.finished.emit()  # Done
-
+        # (Un)locking the material menu
+        self.material_combo_box.setEnabled(not lock)
 
 if __name__ == '__main__':
     # Necessary stuff for errors and exceptions to be thrown
@@ -348,8 +346,9 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     heat_transfer_window = HeatTransferWindow()
 
-    heat_transfer_window.showMaximized()
-    # main.resize(1000, 500)
-    # main.show()
+    # heat_transfer_window.showMaximized()
+    # heat_transfer_window.resize(1000, 500)
+    heat_transfer_window.show()
+
 
     sys.exit(app.exec_())

@@ -25,15 +25,17 @@ class NewCallback:
     """
 
     """
-    def __init__(self, Call_at=200.0, ExperimentData=None, plot_to_update=None, queue=None):
+    def __init__(self, Call_at=200.0, ExperimentData=None, plot_to_update=None, queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
         self.ExperimentData = ExperimentData if ExperimentData is not None else (None, None)
 
         # Takes reference of some plot, which it should update, and some queue,
-        #   through which the GUI will send information
+        #   through which the GUI will send information.
+        # Also save the progress communication channel to update time in GUI
         self.plot_to_update = plot_to_update
         self.queue = queue
+        self.progress_callback = progress_callback
 
         # Setting the starting simulation state as "running" - this can be changed
         #   only through the queue by input from GUI
@@ -50,6 +52,10 @@ class NewCallback:
                                          y_values=Sim.T_x0,
                                          x_experiment_values=self.ExperimentData[0],
                                          y_experiment_values=self.ExperimentData[1])
+
+            # If callback is defined, emit positive value to increment time in GUI
+            if self.progress_callback is not None:
+                self.progress_callback.emit(1)
 
             self.last_call += self.Call_at
 
@@ -73,6 +79,10 @@ class NewCallback:
             except:
                 pass
 
+        # Emit the information that simulation is not running (not to increment time)
+        if self.simulation_state != "running" and self.progress_callback is not None:
+            self.progress_callback.emit(0)
+
         # Returning the current ismulation state to be handled by make_sim_step()
         return self.simulation_state
 
@@ -81,7 +91,7 @@ class Trial():
 
     """
 
-    def PrepareSimulation(self, plot, queue, parameters):
+    def PrepareSimulation(self, progress_callback, plot, queue, parameters):
         """
 
         """
@@ -115,7 +125,10 @@ class Trial():
                               RobinAlpha=13.5,
                               x0=parameters["place_of_interest"])
 
-        self.MyCallBack = NewCallback(plot_to_update=plot, queue=queue, ExperimentData=(t_data, T_data))
+        self.MyCallBack = NewCallback(progress_callback=progress_callback,
+                                      plot_to_update=plot,
+                                      queue=queue,
+                                      ExperimentData=(t_data, T_data))
         self.dt = parameters["dt"]
         self.t_start = t_data[0]
         self.t_stop = t_data[-1]-1
@@ -169,6 +182,8 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1,
             "number_of_elements": 100
         }
 
+    progress_callback.emit(132456)
+
     now = time.time()
 
     # Running the simulation for specific amount of trials
@@ -176,7 +191,7 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1,
         print("Current thread: {}".format(threading.currentThread().getName()))
 
         x = time.time()
-        app.PrepareSimulation(plot, queue, parameters)
+        app.PrepareSimulation(progress_callback, plot, queue, parameters)
         y = time.time()
         print("PrepareSimulation: {}".format(round(y - x, 3)))
         app.make_sim_step()
