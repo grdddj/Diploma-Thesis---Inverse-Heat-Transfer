@@ -29,7 +29,7 @@ parameters = {
     "dt": 1,
     "object_length": 0.01,
     "place_of_interest": 0.00445,
-    "number_of_elements": 30
+    "number_of_elements": 100
 }
 my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
 Sim = Simulation(Length=parameters["object_length"],
@@ -41,7 +41,7 @@ Sim = Simulation(Length=parameters["object_length"],
                       x0=parameters["place_of_interest"])
 
 
-Problem = InverseProblem(Sim, dt=2.0, data_T=T_experiment)
+Problem = InverseProblem(Sim, dt=5.0, data_T=T_experiment)
 x = time.time()
 # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
 while Problem.Sim.t[-1] < t_data[-1]-100:

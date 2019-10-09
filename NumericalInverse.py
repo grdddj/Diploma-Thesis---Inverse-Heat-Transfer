@@ -36,18 +36,20 @@ def SolveInverseStep(Prob, theta=0.5, window_span=3, init_q_adjustment=10, toler
     Prob.Sim.HeatFlux.y[Prob.current_q_idx] = Prob.Sim.HeatFlux.y[Prob.current_q_idx-1]  # explicit portion
     Prob.Sim.HeatFlux.y[Prob.current_q_idx+1] = Prob.Sim.HeatFlux.y[Prob.current_q_idx-1]  # implicit portion
     prev_Error = EvaluateWindowErrorNorm(Prob, window_span)
+    iter = 0
     while True:
         # simulate few steps
-        iter = 0
-        while Prob.Sim.t[-1] < t_stop and iter < window_span:
+        iter += 1
+        step = 0
+        while Prob.Sim.t[-1] < t_stop and step < window_span:
             EvaluateNewStep(Prob.Sim, min(Prob.dt, t_stop-Prob.Sim.t[-1]), theta)
-            iter += 1
+            step += 1
         # calculate error between simulation and experimental data
         new_Error = EvaluateWindowErrorNorm(Prob, window_span)
 
         if abs(prev_Error - new_Error) < tolerance:
             Prob.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
-            print(f"Accepting Flux: %.2f at time %.2f s, ( Error: %.10f )" % (Prob.Sim.HeatFlux.y[Prob.current_q_idx], Prob.Sim.t[-1], new_Error))
+            print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (Prob.Sim.HeatFlux.y[Prob.current_q_idx], Prob.Sim.t[-1], new_Error, iter))
             EvaluateNewStep(Prob.Sim, min(Prob.dt, t_stop-Prob.Sim.t[-1]), theta)  # make one step only
             # TODO:# CallBack should be here probably
             break  # this Flux seems to be ok so stop adjusting it
@@ -60,7 +62,7 @@ def SolveInverseStep(Prob, theta=0.5, window_span=3, init_q_adjustment=10, toler
 
             prev_Error = new_Error
             Prob.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
-            q_adj *= -0.8  # and make adjustments to the heat flux smaller going in the opposite direction because the error got higher last time
+            q_adj *= -0.7  # and make adjustments to the heat flux smaller going in the opposite direction because the error got higher last time
         Prob.Sim.HeatFlux.y[Prob.current_q_idx] += q_adj  # adjust heatflux a little in the explicit portion
         Prob.Sim.HeatFlux.y[Prob.current_q_idx+1] += q_adj  # adjust heatflux a little in the implicit portion
     Prob.current_q_idx += 1  # since the current flux is adjusted enough tell the Prob to adjust next one in next SolveInverseStep call
