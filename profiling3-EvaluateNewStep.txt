@@ -1,0 +1,65 @@
+After getting rid if the deepcloning of A, which was unnecessary, the
+  profiling of EvaluateNewStep() is as follows:
+
+
+Ideas how to further improve speed:
+1) the first part of "b" is always being changed only on the first and last element
+  - the rest stays the same, so we can somehow use this to our advantage
+    (like calculate the difference in first and last element from the normal
+      value, and after making calculation with that just putting the difference back)
+2) research how to make deepcopying quicker, or how to do that other way
+  - https://stackoverflow.com/questions/24756712/deepcopy-is-extremely-slow
+    - found out json serializing cannot be used with csr_matrixes
+  - https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.copy.html
+    - found out csr_matrix.copy() is the same speed as deepcopy() - little bit worse even
+3) it takes considerable amount of time to call callable functions (HeatFlux, T_amb)
+  - could be worth trying to sacrifice some small level of accuracy and
+    write some very simple interpolation ourselves
+  - if I think about it more, it is not so promising, guys at scipy certainly
+    did all they could to make it as fast and as efficient as possible
+4) write this function in C :)
+  - I encountered some examples of using Cython, and it does not look so hard
+    to write something using this
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   130                                           @profile
+   131                                           def EvaluateNewStep(Sim, dt, theta):
+   132                                               # When there was a change in dt or theta from the previous call, there is
+   133                                               #   a need to recalculate values of A_default and b_first_part_default
+   134                                               # NOTE: This will also be run at the very first call, because the values
+   135                                               #   of Sim.current_dt and Sim.current_theta are None at the beginning
+   136     14499     219340.0     15.1      0.2      if dt != Sim.current_dt or theta != Sim.current_theta:
+   137         6      68722.0  11453.7      0.1          Sim.A_default = Sim.M + dt*theta*Sim.K # assemble sparse matrix A from the K and M (see in above class what they are)
+   138         6      36521.0   6086.8      0.0          Sim.A_default[-1,-1] += dt*theta*Sim.RobinAlpha # Precalculating the implicit portion of T_body contribution
+   139         6      37573.0   6262.2      0.0          Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
+   140         6        104.0     17.3      0.0          Sim.current_dt = dt
+   141         6         59.0      9.8      0.0          Sim.current_theta = theta
+   142
+   143                                               # Cloning and calculating the current A and b values
+   144                                               # NOTE: There is a need of deep-copying each time, just referencing it
+   145                                               #   would be incorrect, because we would be changing the default A and b
+   146                                               #   in place, and it should stay the same for each call of this function
+   147                                               # NOTE: The deepcopying of A_default each time was completely wasteful,
+   148                                               #   and was removed, because it's value is never changing, no need to copy it.
+   149                                               #   It was accounting for more than 20 % of the time.
+   150     14499   29492593.0   2034.1     30.0      b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+   151
+   152                                               # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
+   153     14499   11519328.0    794.5     11.7      b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux
+   154     14499    9529274.0    657.2      9.7      b[0] += dt*theta*Sim.HeatFlux(Sim.t[-1] + dt)  # from step k - implicit portion of HeatFlux
+   155
+   156                                               # apply Robin Boundary Condition - telling it how much it cools down because of the air on the other side
+   157                                               # you surely know the equation alpha*(T_body - T_amb) for convective heat trasfer - that what is it doing here
+   158     14499     515815.0     35.6      0.5      b[-1] -= dt*(1-theta)*Sim.RobinAlpha*Sim.T[-1]  # from step k-1 - explicit portion of T_body contribution
+   159                                               # NOTE: "from step k - implicit portion of T_body contribution" moved to a default value,
+   160                                               #       because it was still repeating the same calculation (considering constant dt and theta)
+   161     14499    9118646.0    628.9      9.3      b[-1] += dt*(1-theta)*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1])  # from step k-1 - explicit portion of T_amb contribution
+   162     14499    8993517.0    620.3      9.1      b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
+   163
+   164                                               # solve the equation A*Sim.T=b
+   165     14499   26475315.0   1826.0     26.9      Sim.T = spsolve(Sim.A_default, b)  # solve Sim.T for the new step k
+   166     14499     310760.0     21.4      0.3      Sim.T_record.append(Sim.T)  # push it to designated list
+   167     14499     283080.0     19.5      0.3      Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+   168     14499    1859663.0    128.3      1.9      Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes

@@ -133,8 +133,8 @@ def EvaluateNewStep(Sim, dt, theta):
     # NOTE: This will also be run at the very first call, because the values
     #   of Sim.current_dt and Sim.current_theta are None at the beginning
     if dt != Sim.current_dt or theta != Sim.current_theta:
-        Sim.A_default = Sim.M + dt*theta*Sim.K
-        Sim.A_default[-1,-1] += dt*theta*Sim.RobinAlpha # Precalculating the implicit portion of T_body contribution
+        Sim.A = Sim.M + dt*theta*Sim.K # assemble sparse matrix A from the K and M (see in above class what they are)
+        Sim.A[-1,-1] += dt*theta*Sim.RobinAlpha # Precalculating the implicit portion of T_body contribution
         Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
         Sim.current_dt = dt
         Sim.current_theta = theta
@@ -143,7 +143,9 @@ def EvaluateNewStep(Sim, dt, theta):
     # NOTE: There is a need of deep-copying each time, just referencing it
     #   would be incorrect, because we would be changing the default A and b
     #   in place, and it should stay the same for each call of this function
-    A = deepcopy(Sim.A_default) # assemble sparse matrix A from the K and M (see in above class what they are)
+    # NOTE: The deepcopying of A_default each time was completely wasteful,
+    #   and was removed, because it's value is never changing, no need to copy it.
+    #   It was accounting for more than 20 % of the time.
     b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
 
     # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
@@ -159,7 +161,7 @@ def EvaluateNewStep(Sim, dt, theta):
     b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
 
     # solve the equation A*Sim.T=b
-    Sim.T = spsolve(A, b)  # solve Sim.T for the new step k
+    Sim.T = spsolve(Sim.A, b)  # solve Sim.T for the new step k
     Sim.T_record.append(Sim.T)  # push it to designated list
     Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
     Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes
