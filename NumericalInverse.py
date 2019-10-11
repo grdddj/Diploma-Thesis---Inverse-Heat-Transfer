@@ -7,6 +7,8 @@ from NumericalForward import *
 class InverseProblem():  # later abbreviated as Prob
     def __init__(self, Sim, dt=1.0, q_init=0.0, data_T=None, data_true_q=None):
         self.Sim = Sim  # placeholder for Sim state that the new fluxes are tested on
+        # TODO: when there are high dt, value error can be encountered:
+        #   ValueError: A value in x_new is above the interpolation range.
         self.dt = dt  # placeholder for time step dt
 
         if data_T is not None:
@@ -49,7 +51,7 @@ def SolveInverseStep(Prob, theta=0.5, window_span=3, init_q_adjustment=10, toler
 
         if abs(prev_Error - new_Error) < tolerance:
             Prob.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
-            print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (Prob.Sim.HeatFlux.y[Prob.current_q_idx], Prob.Sim.t[-1], new_Error, iter))
+            # print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (Prob.Sim.HeatFlux.y[Prob.current_q_idx], Prob.Sim.t[-1], new_Error, iter))
             EvaluateNewStep(Prob.Sim, min(Prob.dt, t_stop-Prob.Sim.t[-1]), theta)  # make one step only
             # TODO:# CallBack should be here probably
             break  # this Flux seems to be ok so stop adjusting it

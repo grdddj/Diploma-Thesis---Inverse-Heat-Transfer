@@ -26,7 +26,7 @@ parameters = {
     "rho": 7850,
     "cp": 490,
     "lmbd": 13.5,
-    "dt": 1,
+    "dt": 10,
     "object_length": 0.01,
     "place_of_interest": 0.00445,
     "number_of_elements": 100
@@ -41,11 +41,11 @@ Sim = Simulation(Length=parameters["object_length"],
                       x0=parameters["place_of_interest"])
 
 
-Problem = InverseProblem(Sim, dt=5.0, data_T=T_experiment)
+Problem = InverseProblem(Sim, dt=10.0, data_T=T_experiment)
 x = time.time()
 # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
 while Problem.Sim.t[-1] < t_data[-1]-100:
-    SolveInverseStep(Problem, window_span=3, tolerance=1e-6)
+    SolveInverseStep(Problem, window_span=2, tolerance=1e-6)
     print("Elapsed Time: %.2f seconds." % (time.time()-x))
 
 fig1 = plt.figure()

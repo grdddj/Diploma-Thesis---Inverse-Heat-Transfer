@@ -7,7 +7,7 @@ class UserInputService:
         self.number_parameters_to_get_from_user = [
             {"name": "Simulation step",
                 "input_name": "simulation_step_input_seconds",
-                "default_value": 1.0,
+                "default_value": 10.0,
                 "parse_function": float,
                 "multiplicate_to_SI": 1,
                 "unit": "seconds",
@@ -32,5 +32,12 @@ class UserInputService:
                 "parse_function": int,
                 "multiplicate_to_SI": 1,
                 "unit": "",
-                "unit_abbrev": "-"}
+                "unit_abbrev": "-"},
+            {"name": "Plotting period",
+                "input_name": "plotting_period_input",
+                "default_value": 200,
+                "parse_function": int,
+                "multiplicate_to_SI": 1,
+                "unit": "seconds",
+                "unit_abbrev": "s"}
         ]

@@ -46,6 +46,9 @@ TODOS:
         - (whether import *, import the module, or import individual functions)
     - bear in mind that we want to transition to PySide2 at the very end
     - generalize the fonts
+    - tooltips or some other "help" for the input parameters
+        - to get info to user, what are these parameters, how do they
+            influence speed, accuracy etc.
 
 TODOS FROM Tests.py:
     - offer the option of regular savings (useful in time-consuming simulations)
@@ -65,7 +68,7 @@ TODOS FROM Tests.py:
     - offer "run calculation on background" possibility (without any visual output)
     - parameters that could be inputted from the user:
         - the type of algorithm
-        - the time after which to plot the results (can quicken the simulation)
+        - the plotting period also in "normal" seconds - to show progress periodically
 """
 
 from PyQt5.uic import loadUiType
@@ -78,6 +81,7 @@ import threading
 import queue
 
 import heat_transfer_simulation
+import heat_transfer_simulation_inverse
 
 from heat_transfer_workers import Worker, WorkerSignals
 
@@ -103,11 +107,12 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setWindowTitle("Heat transfer")
 
-        self.add_material_choice()
-        self.add_user_inputs()
+        self.add_algorithm_choice(self.verticalLayout)
+        self.add_material_choice(self.verticalLayout)
+        self.add_user_inputs(self.verticalLayout)
 
-        plot = PlotCanvas(self)
-        self.plot_area_layout_2.addWidget(plot)
+        self.plot = PlotCanvas(self)
+        self.plot_area_layout_2.addWidget(self.plot)
 
         # Having access to the current state of the simulation
         # Can be either "running", "paused", "stopped" or "finished"
@@ -131,28 +136,51 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         self.queue = queue.Queue()
 
-        self.button_run_2.pressed.connect(lambda: self.run_simulation(plot, self.queue))
+        # self.button_run_2.pressed.connect(lambda: self.run_simulation(plot, self.queue))
+        self.button_run_2.pressed.connect(lambda: self.run_simulation())
         self.button_pause_2.pressed.connect(lambda: self.pause_simulation())
         self.button_stop_2.pressed.connect(lambda: self.stop_simulation())
 
-    def add_user_inputs(self):
+    def add_algorithm_choice(self, parent_layout):
+        """
+
+        """
+        new_layout = QtWidgets.QHBoxLayout()
+
+        label = QtWidgets.QLabel("Algorithm choice:")
+        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+
+        self.radio_choice_classic = QtWidgets.QRadioButton("Classic")
+        # self.radio_choice_classic.setChecked(True)
+        self.radio_choice_inverse = QtWidgets.QRadioButton("Inverse")
+        self.radio_choice_inverse.setChecked(True)
+
+        new_layout.addWidget(label)
+        new_layout.addWidget(self.radio_choice_classic)
+        new_layout.addWidget(self.radio_choice_inverse)
+
+        parent_layout.addLayout(new_layout)
+
+    def add_user_inputs(self, parent_layout):
         """
 
         """
         for entry in user_input_service.number_parameters_to_get_from_user:
             new_layout = QtWidgets.QHBoxLayout()
+
             label_text = "{} [{}]:".format(entry["name"], entry["unit_abbrev"])
             label = QtWidgets.QLabel(label_text)
             label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
-            new_layout.addWidget(label)
 
             setattr(self, entry["input_name"], QtWidgets.QLineEdit())
             getattr(self, entry["input_name"]).setText(str(entry["default_value"]))
             getattr(self, entry["input_name"]).setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
             # TODO: add validation to only allow for numbers here
 
+            new_layout.addWidget(label)
             new_layout.addWidget(getattr(self, entry["input_name"]))
-            self.verticalLayout.addLayout(new_layout)
+
+            parent_layout.addLayout(new_layout)
 
     def get_numbers_from_the_user_input(self):
         """
@@ -179,23 +207,24 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         return list_of_values_to_return
 
-
-    def add_material_choice(self):
+    def add_material_choice(self, parent_layout):
         """
 
         """
+        new_layout = QtWidgets.QHBoxLayout()
+
         self.material_combo_box = QtWidgets.QComboBox()
         self.material_combo_box.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
         self.material_combo_box.addItems(material_service.materials_name_list)
         self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index('Iron'))
 
-        new_layout = QtWidgets.QHBoxLayout()
         label = QtWidgets.QLabel("Material: ")
         label.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
-        new_layout.addWidget(label)
 
+        new_layout.addWidget(label)
         new_layout.addWidget(self.material_combo_box)
-        self.verticalLayout.addLayout(new_layout)
+
+        parent_layout.addLayout(new_layout)
         # TODO: add a tooltip with information whenever the material is highlighted:
         #   https://www.tutorialspoint.com/pyqt/pyqt_qcombobox_widget.htm
 
@@ -225,7 +254,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         print("STOPPING THE SIMULATION!!!!")
         self.queue.put("stop")
 
-    def run_simulation(self, plot, queue):
+    def run_simulation(self):
         """
 
         """
@@ -234,14 +263,14 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             return
 
         if self.simulation_state == "paused":
-            queue.put("continue")
+            self.queue.put("continue")
             print("CONTINUING THE SIMULATION!!")
             return
 
         self.simulation_state = "running"
         self.error_label.setText("ERROR:")
         print("RUNNING THE SIMULATION")
-        queue.put("WE HAVE JUST BEGAN!")
+        self.queue.put("WE HAVE JUST BEGAN!")
 
         # Getting current material from GUI and it's peoperties from the service
         current_material = self.material_combo_box.currentText()
@@ -249,7 +278,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         # Getting all other user input for the simulation
         user_input = self.get_numbers_from_the_user_input()
-        dt, object_length, place_of_interest, number_of_elements = user_input
+        dt, object_length, place_of_interest, number_of_elements, callback_period = user_input
 
         parameters = {
             "rho": current_material_properties["rho"],
@@ -258,7 +287,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             "dt": dt,
             "object_length": object_length,
             "place_of_interest": place_of_interest,
-            "number_of_elements": number_of_elements
+            "number_of_elements": number_of_elements,
+            "callback_period": callback_period
         }
 
         self.lock_inputs_for_editing(True)
@@ -272,9 +302,17 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.time_spent_paused = 0
         self.time_in_progress = 0
 
-        # Pass the function to execute
-        worker = Worker(heat_transfer_simulation.run_test, plot=plot, queue=queue,
-                        parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
+        if self.radio_choice_classic.isChecked():
+            print("classic")
+            worker = Worker(heat_transfer_simulation.run_test,
+                            plot=self.plot, queue=self.queue,
+                            parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
+
+        elif self.radio_choice_inverse.isChecked():
+            print("inverse")
+            worker = Worker(heat_transfer_simulation_inverse.run_test,
+                            plot=self.plot, queue=self.queue,
+                            parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
 
         # TODO: decide what to do with this (use it or delete it)
         worker.signals.result.connect(self.process_output)

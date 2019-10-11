@@ -25,7 +25,7 @@ class NewCallback:
     """
 
     """
-    def __init__(self, Call_at=200.0, ExperimentData=None, plot_to_update=None, queue=None, progress_callback=None):
+    def __init__(self, Call_at=500.0, ExperimentData=None, plot_to_update=None, queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
         self.ExperimentData = ExperimentData if ExperimentData is not None else (None, None)
@@ -41,12 +41,12 @@ class NewCallback:
         #   only through the queue by input from GUI
         self.simulation_state = "running"
 
-    def Call(self, Sim):
+    def Call(self, Sim, force_update=False):
         """
 
         """
         # Update the time calculation is in progress
-        if Sim.t[-1] > self.last_call + self.Call_at:  # if it is time to comunicate with GUI then show something
+        if Sim.t[-1] > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.plot_to_update is not None:
                 self.plot_to_update.plot(x_values=Sim.t[1:],
                                          y_values=Sim.T_x0,
@@ -126,6 +126,7 @@ class Trial():
                               x0=parameters["place_of_interest"])
 
         self.MyCallBack = NewCallback(progress_callback=progress_callback,
+                                      Call_at=parameters["callback_period"],
                                       plot_to_update=plot,
                                       queue=queue,
                                       ExperimentData=(t_data, T_data))
@@ -155,6 +156,9 @@ class Trial():
                 print("stopping")
                 break
 
+        # Calling callback at the very end, to update the plot with complete results
+        self.MyCallBack.Call(self.Sim, force_update=True)
+
         self.ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
@@ -179,10 +183,9 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1,
             "dt": 1,
             "object_length": 0.01,
             "place_of_interest": 0.0045,
-            "number_of_elements": 100
+            "number_of_elements": 100,
+            "callback_period": 500
         }
-
-    progress_callback.emit(132456)
 
     now = time.time()
 

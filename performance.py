@@ -102,7 +102,7 @@ if __name__ == '__main__':
     app = Trial()
 
     # The description of tested scenario, what was changed etc.
-    SCENARIO_DESCRIPTION = "Trial"
+    SCENARIO_DESCRIPTION = "PERF"
 
     app.rho = 7850
     app.cp = 520

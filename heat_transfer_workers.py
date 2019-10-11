@@ -3,6 +3,8 @@ This module is responsible for defining Workers that enable multihreading.
 """
 
 from PyQt5 import QtCore
+import traceback
+import sys
 
 class WorkerSignals(QtCore.QObject):
     '''
