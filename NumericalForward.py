@@ -105,24 +105,19 @@ class Simulation:  # In later objects abreviated as Sim
         self.current_dt = None
         self.current_theta = None
 
-        self.checkpoints = []  # In the Inverse problem we will need to revert to previous simulation states
+        # checkpoint stuff
+        self.checkpoint = 0  # placeholder for length of saved data
+        self.T_checkpoint = np.empty(N+1)  # placeholder for actual temperatures saved in checkpoint
 
-    def make_checkpoint(self, new=False):
-        if new or len(self.checkpoints) == 0:
-            self.checkpoints.append({"T": deepcopy(self.T), "T_record": deepcopy(self.T_record), "T_x0": deepcopy(self.T_x0), "t": deepcopy(self.t)})
-        else:
-            self.checkpoints[-1] = {"T": deepcopy(self.T), "T_record": deepcopy(self.T_record), "T_x0": deepcopy(self.T_x0), "t": deepcopy(self.t)}
+    def make_checkpoint(self):
+        self.checkpoint = len(self.t)
+        self.T_checkpoint[:] = self.T[:]
 
-    def revert_to_checkpoint(self, revert_by=1, remove_checkpoints=False):
-        if len(self.checkpoints) != 0:
-            self.T = deepcopy(self.checkpoints[-revert_by]["T"])
-            self.T_record = deepcopy(self.checkpoints[-revert_by]["T_record"])
-            self.t = deepcopy(self.checkpoints[-revert_by]["t"])
-            self.T_x0 = deepcopy(self.checkpoints[-revert_by]["T_x0"])
-            if remove_checkpoints:
-                self.checkpoints.pop(range(-revert_by,-1))
-        else:
-            print("Specified checkpoint not available. Skiping...")
+    def revert_to_checkpoint(self):
+        self.T[:] = self.T_checkpoint[:]
+        self.T_record = self.T_record[0:self.checkpoint]
+        self.t = self.t[0:self.checkpoint]
+        self.T_x0 = self.T_x0[0:self.checkpoint]
 
 # Function that calculates new timestep (Again do not worry about math right now, that will come later)
 # theta is value between 0.0 and 1.0 (float) which gradualy mutates the method from fully explicit (0.0) to fully implicit (1.0)
