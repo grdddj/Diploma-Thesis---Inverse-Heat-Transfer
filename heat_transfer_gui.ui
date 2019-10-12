@@ -65,7 +65,7 @@
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>100</height>
+              <height>120</height>
              </size>
             </property>
             <property name="frameShape">
@@ -92,6 +92,12 @@
                <layout class="QVBoxLayout" name="verticalLayout_4">
                 <item>
                  <widget class="QLabel" name="error_label">
+                  <property name="minimumSize">
+                   <size>
+                    <width>0</width>
+                    <height>60</height>
+                   </size>
+                  </property>
                   <property name="styleSheet">
                    <string notr="true">font: 75 20pt &quot;MS Shell Dlg 2&quot;;</string>
                   </property>
@@ -102,6 +108,12 @@
                 </item>
                 <item>
                  <widget class="QLabel" name="time_label">
+                  <property name="minimumSize">
+                   <size>
+                    <width>0</width>
+                    <height>60</height>
+                   </size>
+                  </property>
                   <property name="styleSheet">
                    <string notr="true">font: 75 20pt &quot;MS Shell Dlg 2&quot;;</string>
                   </property>

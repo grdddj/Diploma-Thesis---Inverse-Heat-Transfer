@@ -141,7 +141,7 @@ def EvaluateNewStep(Sim, dt, theta):
     # NOTE: The deepcopying of A_default each time was completely wasteful,
     #   and was removed, because it's value is never changing, no need to copy it.
     #   It was accounting for more than 20 % of the time.
-    b = deepcopy(Sim.b_first_part_default).dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+    b = Sim.b_first_part_default.dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
 
     # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
     b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux

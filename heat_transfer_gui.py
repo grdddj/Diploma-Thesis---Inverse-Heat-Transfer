@@ -41,7 +41,6 @@ TODOS:
     - add documentation to classes and functions
     - have an eye on speed - maybe it could even handle some multiprocessing
         - (or that FeniCS library)
-    - think about more separation (Workers or PlotCanvas could deserve their own module)
     - think about the imports
         - (whether import *, import the module, or import individual functions)
     - bear in mind that we want to transition to PySide2 at the very end
@@ -49,6 +48,11 @@ TODOS:
     - tooltips or some other "help" for the input parameters
         - to get info to user, what are these parameters, how do they
             influence speed, accuracy etc.
+    - transfer the input+labels to QFormLayout()
+        - https://www.tutorialspoint.com/pyqt/pyqt_qformlayout_class.htm
+    - improve the plotting efficiency
+        - not plotting experiment data each time, just once if possible
+        - just appending the previous graph with newly calculated data
 
 TODOS FROM Tests.py:
     - offer the option of regular savings (useful in time-consuming simulations)
@@ -59,7 +63,6 @@ TODOS FROM Tests.py:
         - consider showing the properties in the menu/next to it
         - consider moving materials to the DB (SQLite3)
     - improve the design of the menus and buttons
-    - include second graph showing heat flux
     - look up the cx_Freeze to-exe module, as pyinstaller produces 300 MB .exe
         - cx_Freeze offers deletion of unused libraries (scipy etc.)
     - create second thread (process) that is responsible for the calculation
@@ -85,13 +88,16 @@ import heat_transfer_simulation_inverse
 
 from heat_transfer_workers import Worker, WorkerSignals
 
-from heat_transfer_plot import PlotCanvas
+from heat_transfer_plot_temperature import TemperaturePlotCanvas
+from heat_transfer_plot_heatflux import HeatFluxPlotCanvas
 
 from heat_transfer_materials import MaterialService
 material_service = MaterialService()
 
-from heat_transfer_user_inputs import UserInputService
-user_input_service = UserInputService()
+from heat_transfer_user_inputs_classic import UserInputServiceClassic
+from heat_transfer_user_inputs_inverse import UserInputServiceInverse
+user_input_service_classic = UserInputServiceClassic()
+user_input_service_inverse = UserInputServiceInverse()
 
 # Creating the UI from the .ui template
 # We could also generate a .py file from it and import it
@@ -107,12 +113,16 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setWindowTitle("Heat transfer")
 
+        # Filling the left side with user choice and inputs
         self.add_algorithm_choice(self.verticalLayout)
         self.add_material_choice(self.verticalLayout)
         self.add_user_inputs(self.verticalLayout)
 
-        self.plot = PlotCanvas(self)
-        self.plot_area_layout_2.addWidget(self.plot)
+        # Adding plots for temperature and heat flux
+        self.temperature_plot = TemperaturePlotCanvas(self)
+        self.heat_flux_plot = HeatFluxPlotCanvas(self)
+        self.plot_area_layout_2.addWidget(self.temperature_plot)
+        self.plot_area_layout_2.addWidget(self.heat_flux_plot)
 
         # Having access to the current state of the simulation
         # Can be either "running", "paused", "stopped" or "finished"
@@ -136,14 +146,71 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         self.queue = queue.Queue()
 
-        # self.button_run_2.pressed.connect(lambda: self.run_simulation(plot, self.queue))
         self.button_run_2.pressed.connect(lambda: self.run_simulation())
         self.button_pause_2.pressed.connect(lambda: self.pause_simulation())
         self.button_stop_2.pressed.connect(lambda: self.stop_simulation())
 
-    def add_algorithm_choice(self, parent_layout):
-        """
+        self.handle_button_highlighting()
 
+    def set_simulation_state(self, new_state, update_buttons=True):
+        """
+        Function to put together the state-change and the specific button
+            highlighting that is connected with the new state.
+        """
+        self.simulation_state = new_state
+        if update_buttons:
+            self.handle_button_highlighting()
+
+    def handle_button_highlighting(self):
+        """
+        Shows to the user in which state the simulation is - by highlighting
+            specific button.
+        We are just playing with the width of the border.
+        """
+        # TODO: research some better way, as this is quite awkward, to assign
+        #       always the whole stylesheet
+        font = 'font: 20pt "MS Shell Dlg 2";'
+        border = 'border: 1px solid black;'
+        border_active = 'border: 15px solid black;'
+        color_run = 'background-color: rgb(0, 255, 0);'
+        color_pause = 'background-color: rgb(255, 140, 0);'
+        color_stop = 'background-color: rgb(255, 0, 0);'
+
+        run_stylesheet = '{} {} {}'.format(font, color_run, border_active if self.simulation_state == "running" else border)
+        pause_stylesheet = '{} {} {}'.format(font, color_pause, border_active if self.simulation_state == "paused" else border)
+        stop_stylesheet = '{} {} {}'.format(font, color_stop, border_active if self.simulation_state == "stopped" else border)
+        self.button_run_2.setStyleSheet(run_stylesheet)
+        self.button_pause_2.setStyleSheet(pause_stylesheet)
+        self.button_stop_2.setStyleSheet(stop_stylesheet)
+
+    def clear_layout(self, layout):
+        """
+        Completely empties the inputted layout, and makes it ready for
+            new information.
+        """
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget() is not None:
+                child.widget().deleteLater()
+            elif child.layout() is not None:
+                self.clear_layout(child.layout())
+
+    def change_user_input(self):
+        """
+        Making sure each algorithm has it's own custom user inputs
+        """
+        # TODO: maybe the algorithm an material choice could stay, and
+        #       only inputs themselves could be deleted and recreated
+        # Clearing the whole layout and filling it again
+        self.clear_layout(self.verticalLayout)
+
+        self.add_algorithm_choice(self.verticalLayout, self.get_current_algorithm())
+        self.add_material_choice(self.verticalLayout)
+        self.add_user_inputs(self.verticalLayout)
+
+    def add_algorithm_choice(self, parent_layout, specified_algorithm=None):
+        """
+        Including the radio buttons for user to choose the algorithm
         """
         new_layout = QtWidgets.QHBoxLayout()
 
@@ -151,9 +218,17 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
 
         self.radio_choice_classic = QtWidgets.QRadioButton("Classic")
-        # self.radio_choice_classic.setChecked(True)
         self.radio_choice_inverse = QtWidgets.QRadioButton("Inverse")
-        self.radio_choice_inverse.setChecked(True)
+
+        # Seeing which algorithm should be checked (useful when rerendering the inputs)
+        if specified_algorithm is None or specified_algorithm == "classic":
+            self.radio_choice_classic.setChecked(True)
+        else:
+            self.radio_choice_inverse.setChecked(True)
+
+        # Listening for changes in the choice of algorithm
+        # TODO: with more than 2 algorithms all would need to listen
+        self.radio_choice_classic.toggled.connect(lambda: self.change_user_input())
 
         new_layout.addWidget(label)
         new_layout.addWidget(self.radio_choice_classic)
@@ -163,14 +238,16 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
     def add_user_inputs(self, parent_layout):
         """
-
+        Including the labels and input fields for all the input data that
+            are required for a current situation (algorithm)
         """
-        for entry in user_input_service.number_parameters_to_get_from_user:
+        for entry in self.get_current_input_service().number_parameters_to_get_from_user:
             new_layout = QtWidgets.QHBoxLayout()
 
             label_text = "{} [{}]:".format(entry["name"], entry["unit_abbrev"])
             label = QtWidgets.QLabel(label_text)
             label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+            label.setToolTip(entry["description"])
 
             setattr(self, entry["input_name"], QtWidgets.QLineEdit())
             getattr(self, entry["input_name"]).setText(str(entry["default_value"]))
@@ -182,15 +259,36 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
             parent_layout.addLayout(new_layout)
 
+    def get_current_input_service(self):
+        """
+        Simplifies the choice of user input service
+        """
+        if self.radio_choice_classic.isChecked():
+            return user_input_service_classic
+        elif self.radio_choice_inverse.isChecked():
+            return user_input_service_inverse
+
+    def get_current_algorithm(self):
+        """
+        Simplifies the access to current algorithm
+        """
+        if self.radio_choice_classic.isChecked():
+            return "classic"
+        elif self.radio_choice_inverse.isChecked():
+            return "inverse"
+
     def get_numbers_from_the_user_input(self):
         """
-        Getting a list of number parameters from the user, according to the
-            passed list of input elements.
+        Getting number parameters from the user in the form of a dictionary.
+            Dictionary is better than list, because we are defining everything
+            including the variable name in a separate file, and GUI does not
+            have to care about anything - just passing whatever is founds
+            to the simulation.
         Depends on all the inputted elements to have a certain structure,
             to be processed the right way.
         """
-        list_of_values_to_return = []
-        for element in user_input_service.number_parameters_to_get_from_user:
+        values_dictionary = {}
+        for element in self.get_current_input_service().number_parameters_to_get_from_user:
             try:
                 # Replacing comma with a dot (for those used to writing decimals places with a comma)
                 value_from_user = getattr(self, element["input_name"]).text().replace(",", ".")
@@ -203,13 +301,13 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
                 # self.show_message_to_the_user("ERROR: Your {} was not a valid number! We gave it a default of {} {}.".format(
                 #     element["name"], element["default_value"], element["unit"]))
 
-            list_of_values_to_return.append(parsed_value_from_user_in_SI)
+            values_dictionary[element["variable_name"]] = parsed_value_from_user_in_SI
 
-        return list_of_values_to_return
+        return values_dictionary
 
     def add_material_choice(self, parent_layout):
         """
-
+        Adding the menu with all possible materials users can choose
         """
         new_layout = QtWidgets.QHBoxLayout()
 
@@ -230,33 +328,39 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
     def simulation_finished(self):
         """
-
+        What to do when simulation is over
         """
         print("SIMULATION FINISHED!!")
         # Allowing all the fields for editing again
         self.lock_inputs_for_editing(False)
 
-        self.simulation_state = "finished"
+        # Unhighlight all buttons, when it was not stopped by the user
+        if self.simulation_state == "stopped":
+            self.set_simulation_state("finished", update_buttons=False)
+        else:
+            self.set_simulation_state("finished")
 
     def pause_simulation(self):
         """
-
+        What to do when simulation is paused
         """
-        self.simulation_state = "paused"
+        self.set_simulation_state("paused")
         print("PAUSING THE SIMULATION!!!!")
+        # Sending signal to the calculating thread to have a rest
         self.queue.put("pause")
 
     def stop_simulation(self):
         """
-
+        What to do when a simulation is stopped
         """
-        self.simulation_state = "stopped"
+        self.set_simulation_state("stopped")
         print("STOPPING THE SIMULATION!!!!")
+        # Telling the calculating thread to give up
         self.queue.put("stop")
 
     def run_simulation(self):
         """
-
+        What to do when a Run button is clicked.
         """
         if self.simulation_state == "running":
             print("SIMULATION IS ALREADY RUNNING!!!")
@@ -264,10 +368,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         if self.simulation_state == "paused":
             self.queue.put("continue")
+            self.set_simulation_state("running")
             print("CONTINUING THE SIMULATION!!")
             return
 
-        self.simulation_state = "running"
+        self.set_simulation_state("running")
         self.error_label.setText("ERROR:")
         print("RUNNING THE SIMULATION")
         self.queue.put("WE HAVE JUST BEGAN!")
@@ -277,20 +382,12 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         current_material_properties = (material_service.materials_properties_dict[current_material])
 
         # Getting all other user input for the simulation
-        user_input = self.get_numbers_from_the_user_input()
-        dt, object_length, place_of_interest, number_of_elements, callback_period = user_input
+        parameters = self.get_numbers_from_the_user_input()
+        parameters["rho"] = current_material_properties["rho"]
+        parameters["cp"] = current_material_properties["cp"]
+        parameters["lmbd"] = current_material_properties["lmbd"]
 
-        parameters = {
-            "rho": current_material_properties["rho"],
-            "cp": current_material_properties["cp"],
-            "lmbd": current_material_properties["lmbd"],
-            "dt": dt,
-            "object_length": object_length,
-            "place_of_interest": place_of_interest,
-            "number_of_elements": number_of_elements,
-            "callback_period": callback_period
-        }
-
+        # Disabling the user from modifying inputs
         self.lock_inputs_for_editing(True)
 
         # Preparing all the time variables for the new simulation
@@ -302,24 +399,32 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.time_spent_paused = 0
         self.time_in_progress = 0
 
-        if self.radio_choice_classic.isChecked():
+        # Defining arguments we will send to workers not depending on algorithm
+        common_arguments_to_workers = {
+            "temperature_plot": self.temperature_plot,
+            "heat_flux_plot": self.heat_flux_plot,
+            "queue": self.queue,
+            "parameters": parameters
+        }
+
+        # Running the specific simulation
+        if self.get_current_algorithm() == "classic":
             print("classic")
             worker = Worker(heat_transfer_simulation.run_test,
-                            plot=self.plot, queue=self.queue,
-                            parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
-
-        elif self.radio_choice_inverse.isChecked():
+                            **common_arguments_to_workers,
+                            SCENARIO_DESCRIPTION="GUI - Classic")
+        elif self.get_current_algorithm() == "inverse":
             print("inverse")
             worker = Worker(heat_transfer_simulation_inverse.run_test,
-                            plot=self.plot, queue=self.queue,
-                            parameters=parameters, SCENARIO_DESCRIPTION="PyQt5_GUI")
+                            **common_arguments_to_workers,
+                            SCENARIO_DESCRIPTION="GUI - Inverse")
 
-        # TODO: decide what to do with this (use it or delete it)
+        # Opening some additional communication channels with the workers
         worker.signals.result.connect(self.process_output)
         worker.signals.finished.connect(self.simulation_finished)
         worker.signals.progress.connect(self.update_simulation_time)
 
-        # Execute
+        # Tell the workers to start the job
         self.threadpool.start(worker)
 
     def update_simulation_time(self, simulation_state):
@@ -351,7 +456,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
     def process_output(self, returned_object):
         """
-
+        Displaying the information returned after the simulation has finished
         """
         print(returned_object)
         # TODO: create a function to change this error, and to colour it accordingly
@@ -364,8 +469,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             lock  (bool) ... If the inputs should be locked (True)
                              or unlocked (False)
         """
-        # (UN)locking the number inputs
-        for element in user_input_service.number_parameters_to_get_from_user:
+        # TODO: find out how to disable the algorithm radio button
+        #   maybe https://stackoverflow.com/questions/11472284/how-to-set-a-read-only-checkbox-in-pyside-pyqt
+
+        # (Un)locking the number inputs
+        for element in self.get_current_input_service().number_parameters_to_get_from_user:
             getattr(self, element["input_name"]).setReadOnly(lock)
 
         # (Un)locking the material menu
@@ -384,9 +492,8 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     heat_transfer_window = HeatTransferWindow()
 
-    # heat_transfer_window.showMaximized()
+    heat_transfer_window.showMaximized()
     # heat_transfer_window.resize(1000, 500)
-    heat_transfer_window.show()
-
+    # heat_transfer_window.show()
 
     sys.exit(app.exec_())

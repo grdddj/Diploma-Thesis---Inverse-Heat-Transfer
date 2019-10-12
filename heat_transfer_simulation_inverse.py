@@ -12,15 +12,19 @@ class InverseCallback:
     """
 
     """
-    def __init__(self, Call_at=500.0, ExperimentData=None, plot_to_update=None, queue=None, progress_callback=None):
+    def __init__(self, Call_at=500.0, ExperimentData=None, heat_flux_plot=None,
+                 temperature_plot=None,queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
-        self.ExperimentData = ExperimentData if ExperimentData is not None else (None, None)
+
+        default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
+        self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
 
         # Takes reference of some plot, which it should update, and some queue,
         #   through which the GUI will send information.
         # Also save the progress communication channel to update time in GUI
-        self.plot_to_update = plot_to_update
+        self.temperature_plot = temperature_plot
+        self.heat_flux_plot = heat_flux_plot
         self.queue = queue
         self.progress_callback = progress_callback
 
@@ -34,17 +38,19 @@ class InverseCallback:
         """
         # Update the time calculation is in progress
         if Sim.t[-1] > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
-            print("TIME!!")
-            if self.plot_to_update is not None:
-                print("PLOT")
-                print("sim.t-1 length: {}".format(len(Sim.t[1:])))
-                print("HeatFlux.y length: {}".format(len(Sim.HeatFlux.y)))
-                print("HeatFlux.x length: {}".format(len(Sim.HeatFlux.x)))
-                # self.plot_to_update.plot(x_values=Sim.t[1:],
-                self.plot_to_update.plot(x_values=Sim.HeatFlux.x,
-                                         y_values=Sim.HeatFlux.y)
-                                         # x_experiment_values=self.ExperimentData[0],
-                                         # y_experiment_values=self.ExperimentData[1])
+            if self.temperature_plot is not None:
+                self.temperature_plot.plot(x_values=Sim.t[1:],
+                                         y_values=Sim.T_x0,
+                                         x_experiment_values=self.ExperimentData["time"],
+                                         y_experiment_values=self.ExperimentData["temperature"])
+
+            if self.heat_flux_plot is not None:
+                # Showing only the already calculated part of the heat flux
+                calculated_length = len(Sim.T_x0)
+                self.heat_flux_plot.plot(x_values=Sim.HeatFlux.x[:calculated_length],
+                                         y_values=Sim.HeatFlux.y[:calculated_length],
+                                         x_experiment_values=self.ExperimentData["time"],
+                                         y_experiment_values=self.ExperimentData["heat_flux"])
 
             # If callback is defined, emit positive value to increment time in GUI
             if self.progress_callback is not None:
@@ -55,7 +61,6 @@ class InverseCallback:
         # TODO: decide how often to read the queue (look if it does not affect performance a lot)
         # TODO: make sure there is not more than 1 message in queue (no leftovers)
         if self.queue is not None:
-            "QUEUE"
             # Try to get last item from the queue sent from GUI
             try:
                 msg = self.queue.get_nowait()
@@ -85,7 +90,8 @@ class InverseTrial:
 
     """
 
-    def PrepareSimulation(self, progress_callback, plot, queue, parameters):
+    def PrepareSimulation(self, progress_callback, temperature_plot,
+                          heat_flux_plot, queue, parameters):
         """
 
         """
@@ -104,16 +110,24 @@ class InverseTrial:
                 self.q_data.append(float(row[2]))
                 T_amb_data.append(float(row[3]))
 
-        q_experiment = MakeDataCallable(self.t_data, self.q_data)  # colapse data into callable function test_q(t)
+        self.q_experiment = MakeDataCallable(self.t_data, self.q_data)  # colapse data into callable function test_q(t)
         T_experiment = MakeDataCallable(self.t_data, self.T_data)  # colapse data into callable function T_experiment(t)
         T_amb = MakeDataCallable(self.t_data, T_amb_data)  # colapse data into callable function T_amb(t)
         # Look into NumericalForward.py for details
+
+        ExperimentData = {
+            "time": self.t_data,
+            "temperature": self.T_data,
+            "heat_flux": self.q_data
+        }
+
+        self.window_span = parameters["window_span"]
 
         my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
         self.Sim = Simulation(Length=parameters["object_length"],
                               Material=my_material,
                               N=parameters["number_of_elements"],
-                              HeatFlux=q_experiment,
+                              HeatFlux=self.q_experiment,
                               AmbientTemperature=T_amb,
                               RobinAlpha=10.5,
                               x0=parameters["place_of_interest"])
@@ -122,45 +136,44 @@ class InverseTrial:
                                       dt=parameters["dt"],
                                       data_T=T_experiment)
 
-        self.MyCallback = InverseCallback(progress_callback=progress_callback,
+        self.MyCallBack = InverseCallback(progress_callback=progress_callback,
                                           Call_at=parameters["callback_period"],
-                                          plot_to_update=plot,
+                                          temperature_plot=temperature_plot,
+                                          heat_flux_plot=heat_flux_plot,
                                           queue=queue,
-                                          ExperimentData=(self.t_data, self.T_data))
+                                          ExperimentData=ExperimentData)
 
     def make_inverse_step(self):
         """
 
         """
         while self.Problem.Sim.t[-1] < self.t_data[-1]-100:
-            SolveInverseStep(self.Problem, window_span=2, tolerance=1e-6)
-            # print("Elapsed Time: %.2f seconds." % (time.time()-x))
-            self.MyCallback.Call(self.Problem.Sim)
+            # Processing the callback and getting the simulation state at the same time
+            # Then acting accordingly to the current state
+            simulation_state = self.MyCallBack.Call(self.Sim)
+            if simulation_state == "running":
+                SolveInverseStep(self.Problem, window_span=self.window_span, tolerance=1e-6)
+            elif simulation_state == "paused":
+                import random
+                if random.random() < 0.1:
+                    print("sleep")
+                time.sleep(0.1)
+            elif simulation_state == "stopped":
+                print("stopping")
+                break
 
-        # TODO: WHY ARE THE CALLBACKS NOT WOTKING FURTHER WAY????
-        #     AttributeError: 'InverseTrial' object has no attribute 'MyCallBack'
-        # self.MyCallBack.Call(self.Problem.Sim, force_update=True)
+        # Calling callback at the very end, to update the plot with complete results
+        self.MyCallBack.Call(self.Problem.Sim, force_update=True)
 
-        # while self.Problem.Sim.t[-1] < self.t_data[-1]-100:
-        #     # Processing the callback and getting the simulation state at the same time
-        #     # Then acting accordingly to the current state
-        #     print("preparing to clal callback")
-        #     simulation_state = self.MyCallBack.Call(self.Sim)
-        #     if simulation_state == "running":
-        #         SolveInverseStep(self.Problem, window_span=2, tolerance=1e-6)
-        #     elif simulation_state == "paused":
-        #         import random
-        #         if random.random() < 0.1:
-        #             print("sleep")
-        #         time.sleep(0.1)
-        #     elif simulation_state == "stopped":
-        #         print("stopping")
-        #         break
-        #
-        # self.MyCallBack.Call(self.Problem.Sim, force_update=True)
+        # TODO: review this, as it might not be correct
+        heat_flux_length = len(self.Sim.t)
+        self.ErrorNorm = np.sum(abs(self.Problem.Sim.HeatFlux.y[:heat_flux_length] - self.q_experiment(self.Sim.t)))/heat_flux_length
+        self.ErrorNorm = round(self.ErrorNorm, 3)
+        print("Error norm: {}".format(self.ErrorNorm))
 
-def run_test(plot=None, progress_callback=None, amount_of_trials=1,
-             queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
+
+def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
+             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
     """
 
     """
@@ -180,16 +193,21 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1,
             "object_length": 0.01,
             "place_of_interest": 0.0045,
             "number_of_elements": 100,
-            "callback_period": 500
+            "callback_period": 500,
+            "window_span": 2
         }
 
-    app.PrepareSimulation(progress_callback, plot, queue, parameters)
+    app.PrepareSimulation(progress_callback=progress_callback,
+                          temperature_plot=temperature_plot,
+                          heat_flux_plot=heat_flux_plot,
+                          queue=queue,
+                          parameters=parameters)
 
     x = time.time()
     # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
     app.make_inverse_step()
 
-    return {"error_value": 3.14}
+    return {"error_value": app.ErrorNorm}
 
     # fig1 = plt.figure()
     # plt.plot(app.t_data, app.q_data)

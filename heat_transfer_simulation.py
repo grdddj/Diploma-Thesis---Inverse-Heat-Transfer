@@ -25,17 +25,25 @@ class NewCallback:
     """
 
     """
-    def __init__(self, Call_at=500.0, ExperimentData=None, plot_to_update=None, queue=None, progress_callback=None):
+    def __init__(self, Call_at=500.0, ExperimentData=None, heat_flux_plot=None,
+                 temperature_plot=None,queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
-        self.ExperimentData = ExperimentData if ExperimentData is not None else (None, None)
+
+        default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
+        self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
 
         # Takes reference of some plot, which it should update, and some queue,
         #   through which the GUI will send information.
         # Also save the progress communication channel to update time in GUI
-        self.plot_to_update = plot_to_update
+        self.temperature_plot = temperature_plot
+        self.heat_flux_plot = heat_flux_plot
         self.queue = queue
         self.progress_callback = progress_callback
+
+        # We do not want to waste time by plotting the same heat_flux values
+        #   over and over, so we do that only once, and flag it to be done
+        self.heat_flux_already_plotted = False
 
         # Setting the starting simulation state as "running" - this can be changed
         #   only through the queue by input from GUI
@@ -47,11 +55,19 @@ class NewCallback:
         """
         # Update the time calculation is in progress
         if Sim.t[-1] > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
-            if self.plot_to_update is not None:
-                self.plot_to_update.plot(x_values=Sim.t[1:],
+            if self.temperature_plot is not None:
+                self.temperature_plot.plot(x_values=Sim.t[1:],
                                          y_values=Sim.T_x0,
-                                         x_experiment_values=self.ExperimentData[0],
-                                         y_experiment_values=self.ExperimentData[1])
+                                         x_experiment_values=self.ExperimentData["time"],
+                                         y_experiment_values=self.ExperimentData["temperature"])
+
+            # Plotting the heat flux graph at the very beginning and marking it done
+            if not self.heat_flux_already_plotted and self.heat_flux_plot is not None:
+                self.heat_flux_plot.plot(x_values=None,
+                                         y_values=None,
+                                         x_experiment_values=self.ExperimentData["time"],
+                                         y_experiment_values=self.ExperimentData["heat_flux"])
+                self.heat_flux_already_plotted = True
 
             # If callback is defined, emit positive value to increment time in GUI
             if self.progress_callback is not None:
@@ -91,7 +107,8 @@ class Trial():
 
     """
 
-    def PrepareSimulation(self, progress_callback, plot, queue, parameters):
+    def PrepareSimulation(self, progress_callback, temperature_plot,
+                          heat_flux_plot, queue, parameters):
         """
 
         """
@@ -110,26 +127,33 @@ class Trial():
                 q_data.append(float(row[2]))
                 T_amb_data.append(float(row[3]))
 
-        test_q = MakeDataCallable(t_data, q_data)  # colapse data into callable function test_q(t)
+        q_experiment = MakeDataCallable(t_data, q_data)  # colapse data into callable function q_experiment(t)
         self.T_experiment = MakeDataCallable(t_data, T_data)  # colapse data into callable function T_experiment(t)
         T_amb = MakeDataCallable(t_data, T_amb_data)  # colapse data into callable function T_amb(t)
         # Look into NumericalForward.py for details
+
+        ExperimentData = {
+            "time": t_data,
+            "temperature": T_data,
+            "heat_flux": q_data
+        }
 
         # This  is how the experiment recorded in DATA.csv was aproximately done
         my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
         self.Sim = Simulation(Length=parameters["object_length"],
                               Material=my_material,
                               N=parameters["number_of_elements"],
-                              HeatFlux=test_q,
+                              HeatFlux=q_experiment,
                               AmbientTemperature=T_amb,
                               RobinAlpha=13.5,
                               x0=parameters["place_of_interest"])
 
         self.MyCallBack = NewCallback(progress_callback=progress_callback,
                                       Call_at=parameters["callback_period"],
-                                      plot_to_update=plot,
+                                      temperature_plot=temperature_plot,
+                                      heat_flux_plot=heat_flux_plot,
                                       queue=queue,
-                                      ExperimentData=(t_data, T_data))
+                                      ExperimentData=ExperimentData)
         self.dt = parameters["dt"]
         self.t_start = t_data[0]
         self.t_stop = t_data[-1]-1
@@ -163,8 +187,8 @@ class Trial():
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
 
-def run_test(plot=None, progress_callback=None, amount_of_trials=1,
-             queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
+def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
+             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
     """
 
     """
@@ -194,7 +218,11 @@ def run_test(plot=None, progress_callback=None, amount_of_trials=1,
         print("Current thread: {}".format(threading.currentThread().getName()))
 
         x = time.time()
-        app.PrepareSimulation(progress_callback, plot, queue, parameters)
+        app.PrepareSimulation(progress_callback=progress_callback,
+                              temperature_plot=temperature_plot,
+                              heat_flux_plot=heat_flux_plot,
+                              queue=queue,
+                              parameters=parameters)
         y = time.time()
         print("PrepareSimulation: {}".format(round(y - x, 3)))
         app.make_sim_step()

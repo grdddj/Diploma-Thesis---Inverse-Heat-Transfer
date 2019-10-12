@@ -10,7 +10,7 @@ from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar)
 
-class PlotCanvas(FigureCanvas):
+class HeatFluxPlotCanvas(FigureCanvas):
     """
 
     """
@@ -25,7 +25,7 @@ class PlotCanvas(FigureCanvas):
                 QtWidgets.QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
-        self.temperature_subplot = self.figure.add_subplot(111)
+        self.heat_flux_subplot = self.figure.add_subplot(111)
 
         self.plot()
 
@@ -35,19 +35,18 @@ class PlotCanvas(FigureCanvas):
 
         """
         # TODO: make the plot at the beginning to say something, like "Press RUN"
-        if x_values is None:
-            x_values = [random.random() for i in range(25)]
-        if y_values is None:
-            y_values = [random.random() for i in range(25)]
-        self.temperature_subplot.cla()
-        self.temperature_subplot.set_title('Heat Transfer plot')
-        self.temperature_subplot.set_xlabel("Time [s]")
-        self.temperature_subplot.set_ylabel("Temperature [°C]")
+        self.heat_flux_subplot.cla()
+        self.heat_flux_subplot.set_title('Heat flux plot')
+        self.heat_flux_subplot.set_xlabel("Time [s]")
+        self.heat_flux_subplot.set_ylabel("Heat flux [W]")
 
-        self.temperature_subplot.plot(x_values, y_values, label='Calculated Data')
+        if x_values is not None and y_values is not None:
+            min_length = min(len(x_values), len(y_values))
+            self.heat_flux_subplot.plot(x_values[:min_length], y_values[:min_length], label='Calculated Data', color="blue")
         if x_experiment_values is not None and y_experiment_values is not None:
-            self.temperature_subplot.plot(x_experiment_values, y_experiment_values, label='Experiment Data')
+            min_length = min(len(x_experiment_values), len(y_experiment_values))
+            self.heat_flux_subplot.plot(x_experiment_values[:min_length], y_experiment_values[:min_length], label='Experiment Data', color="orange")
 
 
-        self.temperature_subplot.legend()
+        self.heat_flux_subplot.legend()
         self.draw()
