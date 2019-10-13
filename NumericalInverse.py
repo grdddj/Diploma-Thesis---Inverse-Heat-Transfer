@@ -28,8 +28,7 @@ class InverseProblem():  # later abbreviated as Prob
         self.data_true_q = data_true_q  # optional - true fluxes for validation if testing
 
 def EvaluateWindowErrorNorm(Prob, window_span):
-    Error = sum((Prob.Sim.T_x0[-window_span:] - Prob.data_T(Prob.Sim.t[-window_span:]))**2)/window_span
-    return Error
+    return sum((Prob.Sim.T_x0[-window_span:] - Prob.data_T(Prob.Sim.t[-window_span:]))**2)
 
 def SolveInverseStep(Prob, theta=0.5, window_span=3, init_q_adjustment=10, tolerance=1e-8, CallBack=None):
     t_stop = Prob.data_T.x[-1]

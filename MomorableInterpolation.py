@@ -1,47 +1,38 @@
 import numpy as np
+import random
 
 class Interpolate_1D():
-
-    def __init__(self, x, y, start_ahead_idx = 0):
-        """This will look forward from point where it found the value
-           last time. We will never be looking for values that are infront"""
+    def __init__(self, x, y, start_ahead_idx=0):
+        """Interpolation looking for values in vicinity of where it has found the answer before."""
         self.x = np.array(x)  # placeholder for x coordinates
         self.y = np.array(y)  # placeholder for y coordinates
-        self.x_min = x[0]
-        self.x_max = x[-1]
-        self.max_idx = len(x)  # maximum index of data
+        self.x_min = self.x[0]
+        self.x_max = self.x[-1]
         self.ahead_idx = start_ahead_idx  # where was the last found x coordinate
         self.previous_call_x = x[0]  # last lookup value of x for case we actually need to go back
 
-    def __call__(self,x,record_call=True):
+    def __call__(self,x):
         try:
-            len(x)
-            return self.calculate_list(x,record_call)
+            length=len(x)
+            return self.calculate_list(x,length)
         except:
-            return self.calculate_item(x,record_call)
+            return self.calculate_item(x)
 
-    def calculate_item(self,x,record_call):
-        idx = self.ahead_idx  # look around from here
+    def calculate_item(self,x):
 
-        if x >= self.x_max:
-            return self.y[-2]+((self.y[-1] - self.y[-2])/(self.x[-1] - self.x[-2]))*(x-self.x[-2])
-        elif x <= self.x_min:
-            return self.y[0]+((self.y[1] - self.y[0])/(self.x[1] - self.x[0]))*(x-self.x[0])
-        elif x > self.previous_call_x:  # check if x increased between calls
-            while not x <= self.x[idx+1]:
-                idx += 1
+        if x > self.previous_call_x:  # check if x increased between calls
+            while x > self.x[self.ahead_idx+1] and x < self.x_max:
+                self.ahead_idx += 1
         elif x < self.previous_call_x:
-            while not x >= self.x[idx+1]:
-                idx -= 1
+            while x < self.x[self.ahead_idx+1] and x > self.x_min:
+                self.ahead_idx -= 1
 
-        if record_call:
-            self.ahead_idx = idx
-            self.previous_call_x = x
-        # calculate value
-        return self.y[idx]+((self.y[idx+1] - self.y[idx])/(self.x[idx+1] - self.x[idx]))*(x-self.x[idx])
+        self.previous_call_x = x
 
-    def calculate_list(self,x,record_call):
-        y=[]
-        for item in x:
-            y.append(self.calculate_item(item,record_call))
-        return np.array(y)
+        return self.y[self.ahead_idx]+((self.y[self.ahead_idx+1] - self.y[self.ahead_idx])/(self.x[self.ahead_idx+1] - self.x[self.ahead_idx]))*(x-self.x[self.ahead_idx])
+
+    def calculate_list(self,x,length):
+        y = np.zeros(length)
+        for i in range(length):
+            y[i] = self.calculate_item(x[i])
+        return y

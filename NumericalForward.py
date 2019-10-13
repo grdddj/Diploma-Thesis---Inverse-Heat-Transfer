@@ -6,12 +6,12 @@
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
 from scipy.sparse.linalg import spsolve    # this guy can solve equation faster by taking advantage of the sparsity (it ignores zeros in the matrices)
+import scipy.interpolate as interpolate
 import MomorableInterpolation
 import matplotlib.pyplot as plt  # some ploting backend - but you can change to whatever you need
 
 # Used to deepcopy matrixes and arrays, so that the new copy can be modified
 #   without changing the original one
-from copy import deepcopy
 
 def Default_HeatFlux(t):
     return 1e5*np.sin(2*np.pi*t*(1/10))
@@ -39,6 +39,7 @@ def MakeDataCallable(x,y):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html#scipy.interpolate.interp1d
     # This interpolation is linear by default
     return MomorableInterpolation.Interpolate_1D(x, y)
+    #return interpolate.interp1d(x,y)
 
 # material properties - we can make some basic database of those, but I  would leave an option to define custom ones
 # Yeah, the DB will be provided, with the ability of defining custom materials.
@@ -122,6 +123,7 @@ class Simulation:  # In later objects abreviated as Sim
 # Function that calculates new timestep (Again do not worry about math right now, that will come later)
 # theta is value between 0.0 and 1.0 (float) which gradualy mutates the method from fully explicit (0.0) to fully implicit (1.0)
 # so we have a lot of methods packed in one function
+
 def EvaluateNewStep(Sim, dt, theta):
     # When there was a change in dt or theta from the previous call, there is
     #   a need to recalculate values of A_default and b_first_part_default
