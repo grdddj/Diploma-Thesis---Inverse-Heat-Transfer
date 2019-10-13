@@ -6,7 +6,7 @@
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
 from scipy.sparse.linalg import spsolve    # this guy can solve equation faster by taking advantage of the sparsity (it ignores zeros in the matrices)
-import scipy.interpolate as interpolate  # well this guy is quite obvious
+import MomorableInterpolation
 import matplotlib.pyplot as plt  # some ploting backend - but you can change to whatever you need
 
 # Used to deepcopy matrixes and arrays, so that the new copy can be modified
@@ -38,7 +38,7 @@ def Default_AmbientTemperature(t):
 def MakeDataCallable(x,y):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html#scipy.interpolate.interp1d
     # This interpolation is linear by default
-    return interpolate.interp1d(x, y)
+    return MomorableInterpolation.Interpolate_1D(x, y)
 
 # material properties - we can make some basic database of those, but I  would leave an option to define custom ones
 # Yeah, the DB will be provided, with the ability of defining custom materials.
