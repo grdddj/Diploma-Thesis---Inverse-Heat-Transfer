@@ -1,0 +1,45 @@
+Very good job with the interpolation, you are about 5-times quicker than scipy!
+  (I would guess they are not optimized for our purpose of evaluating values
+  in the sequence from the beginning to the end, without any bigger jumps)
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   127                                           @profile
+   128                                           def EvaluateNewStep(Sim, dt, theta):
+   129                                               # When there was a change in dt or theta from the previous call, there is
+   130                                               #   a need to recalculate values of A_default and b_first_part_default
+   131                                               # NOTE: This will also be run at the very first call, because the values
+   132                                               #   of Sim.current_dt and Sim.current_theta are None at the beginning
+   133     24165     354745.0     14.7      0.5      if dt != Sim.current_dt or theta != Sim.current_theta:
+   134        10     124632.0  12463.2      0.2          Sim.A = Sim.M + dt*theta*Sim.K # assemble sparse matrix A from the K and M (see in above class what they are)
+   135        10      69164.0   6916.4      0.1          Sim.A[-1,-1] += dt*theta*Sim.RobinAlpha # Precalculating the implicit portion of T_body contribution
+   136        10      71161.0   7116.1      0.1          Sim.b_first_part_default = Sim.M - dt*(1-theta)*Sim.K
+   137        10        204.0     20.4      0.0          Sim.current_dt = dt
+   138        10        253.0     25.3      0.0          Sim.current_theta = theta
+   139
+   140                                               # Cloning and calculating the current A and b values
+   141                                               # NOTE: There is a need of deep-copying each time, just referencing it
+   142                                               #   would be incorrect, because we would be changing the default A and b
+   143                                               #   in place, and it should stay the same for each call of this function
+   144                                               # NOTE: The deepcopying of A_default each time was completely wasteful,
+   145                                               #   and was removed, because it's value is never changing, no need to copy it.
+   146                                               #   It was accounting for more than 20 % of the time.
+   147     24165    6268941.0    259.4      9.0      b = Sim.b_first_part_default.dot(Sim.T)  # Assemble vector b (matmul is matrix multiplication)
+   148
+   149                                               # apply the Neumann Boundary Condition - telling it how much heat is going in from the side
+   150     24165    3483378.0    144.1      5.0      b[0] += dt*(1-theta)*Sim.HeatFlux(Sim.t[-1])  # from step k-1 - explicit portion of HeatFlux
+   151     24165    3297818.0    136.5      4.7      b[0] += dt*theta*Sim.HeatFlux(Sim.t[-1] + dt)  # from step k - implicit portion of HeatFlux
+   152
+   153                                               # apply Robin Boundary Condition - telling it how much it cools down because of the air on the other side
+   154                                               # you surely know the equation alpha*(T_body - T_amb) for convective heat trasfer - that what is it doing here
+   155     24165     687015.0     28.4      1.0      b[-1] -= dt*(1-theta)*Sim.RobinAlpha*Sim.T[-1]  # from step k-1 - explicit portion of T_body contribution
+   156                                               # NOTE: "from step k - implicit portion of T_body contribution" moved to a default value,
+   157                                               #       because it was still repeating the same calculation (considering constant dt and theta)
+   158     24165    2522549.0    104.4      3.6      b[-1] += dt*(1-theta)*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1])  # from step k-1 - explicit portion of T_amb contribution
+   159     24165    3016022.0    124.8      4.3      b[-1] += dt*theta*Sim.RobinAlpha*Sim.T_amb(Sim.t[-1] + dt)  # from step k-1 - implicit portion of T_amb contribution
+   160
+   161                                               # solve the equation A*Sim.T=b
+   162     24165   45392731.0   1878.4     65.1      Sim.T = spsolve(Sim.A, b)  # solve Sim.T for the new step k
+   163     24165     474386.0     19.6      0.7      Sim.T_record.append(Sim.T)  # push it to designated list
+   164     24165     449300.0     18.6      0.6      Sim.t.append(Sim.t[-1] + dt)  # push time step to its list
+   165     24165    3545650.0    146.7      5.1      Sim.T_x0.append(np.interp(Sim.x0, Sim.x, Sim.T))  # save data from the temperature probes

@@ -37,6 +37,10 @@ TODOS:
     - create some area where to show error messages to the user
         - or create a popup window with the same intent
     - create the saving of images and CSV files as a result
+        - try to implement that in plot modules
+        - try extracting x and y data from the graph, so that we do not need
+            to store these data contiually
+            - or have them shipped from the simulation script, when it finishes
     - find out how to make the left arguments-menu not occupy the whole height
     - add documentation to classes and functions
     - have an eye on speed - maybe it could even handle some multiprocessing
@@ -45,14 +49,13 @@ TODOS:
         - (whether import *, import the module, or import individual functions)
     - bear in mind that we want to transition to PySide2 at the very end
     - generalize the fonts
-    - tooltips or some other "help" for the input parameters
-        - to get info to user, what are these parameters, how do they
-            influence speed, accuracy etc.
     - transfer the input+labels to QFormLayout()
         - https://www.tutorialspoint.com/pyqt/pyqt_qformlayout_class.htm
     - improve the plotting efficiency
         - not plotting experiment data each time, just once if possible
         - just appending the previous graph with newly calculated data
+    - consider creating two subplots of the same plot, to be able to export
+        both plots to the same picture
 
 TODOS FROM Tests.py:
     - offer the option of regular savings (useful in time-consuming simulations)
@@ -114,19 +117,19 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle("Heat transfer")
 
         # Filling the left side with user choice and inputs
-        self.add_algorithm_choice(self.verticalLayout)
-        self.add_material_choice(self.verticalLayout)
-        self.add_user_inputs(self.verticalLayout)
+        self.add_algorithm_choice(self.verticalLayout_6)
+        self.add_material_choice(self.verticalLayout_6)
+        self.add_user_inputs(self.verticalLayout_6)
 
         # Adding plots for temperature and heat flux
         self.temperature_plot = TemperaturePlotCanvas(self)
         self.heat_flux_plot = HeatFluxPlotCanvas(self)
-        self.plot_area_layout_2.addWidget(self.temperature_plot)
-        self.plot_area_layout_2.addWidget(self.heat_flux_plot)
+        self.plot_area_layout_3.addWidget(self.temperature_plot)
+        self.plot_area_layout_3.addWidget(self.heat_flux_plot)
 
         # Having access to the current state of the simulation
-        # Can be either "running", "paused", "stopped" or "finished"
-        self.simulation_state = None
+        # Can be either "started", "running", "paused", "stopped" or "finished"
+        self.simulation_state = "started"
 
         # Saving the material we are simulating right now
         self.chosen_material = None
@@ -146,11 +149,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         self.queue = queue.Queue()
 
-        self.button_run_2.pressed.connect(lambda: self.run_simulation())
-        self.button_pause_2.pressed.connect(lambda: self.pause_simulation())
-        self.button_stop_2.pressed.connect(lambda: self.stop_simulation())
+        self.button_run_3.pressed.connect(lambda: self.run_simulation())
+        self.button_pause_3.pressed.connect(lambda: self.pause_simulation())
+        self.button_stop_3.pressed.connect(lambda: self.stop_simulation())
 
-        self.handle_button_highlighting()
+        self.update_state_for_the_user()
 
     def set_simulation_state(self, new_state, update_buttons=True):
         """
@@ -159,13 +162,14 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         self.simulation_state = new_state
         if update_buttons:
-            self.handle_button_highlighting()
+            self.update_state_for_the_user()
 
-    def handle_button_highlighting(self):
+    def update_state_for_the_user(self):
         """
         Shows to the user in which state the simulation is - by highlighting
             specific button.
         We are just playing with the width of the border.
+        Also mentioning the simulation state in the user info label.
         """
         # TODO: research some better way, as this is quite awkward, to assign
         #       always the whole stylesheet
@@ -179,9 +183,20 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         run_stylesheet = '{} {} {}'.format(font, color_run, border_active if self.simulation_state == "running" else border)
         pause_stylesheet = '{} {} {}'.format(font, color_pause, border_active if self.simulation_state == "paused" else border)
         stop_stylesheet = '{} {} {}'.format(font, color_stop, border_active if self.simulation_state == "stopped" else border)
-        self.button_run_2.setStyleSheet(run_stylesheet)
-        self.button_pause_2.setStyleSheet(pause_stylesheet)
-        self.button_stop_2.setStyleSheet(stop_stylesheet)
+        self.button_run_3.setStyleSheet(run_stylesheet)
+        self.button_pause_3.setStyleSheet(pause_stylesheet)
+        self.button_stop_3.setStyleSheet(stop_stylesheet)
+
+        if self.simulation_state == "started":
+            self.show_message_to_user("Choose your parameters and click Run button. Hover over parameters to get details.")
+        elif self.simulation_state == "running":
+            self.show_message_to_user("Simulation started. Click Pause to pause it, or Stop to abort it completely.")
+        elif self.simulation_state == "paused":
+            self.show_message_to_user("Simulation paused. Click Run to continue simulation.")
+        elif self.simulation_state == "stopped":
+            self.show_message_to_user("Simulation stopped. Click Run to start with new simulation.")
+        elif self.simulation_state == "finished":
+            self.show_message_to_user("Simulation finished. Click Run to start with new simulation.")
 
     def clear_layout(self, layout):
         """
@@ -195,6 +210,24 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             elif child.layout() is not None:
                 self.clear_layout(child.layout())
 
+    def show_message_to_user(self, message):
+        """
+        Shows arbitrary message (general info or error) to the user.
+        """
+        print(message)
+        self.info_label.setText(message)
+
+    def show_error_dialog_to_user(self, error_message):
+        """
+        Displays a separate dialog (alert) informing user of something bad, like
+            invalid user input.
+        """
+
+        # TODO: implement the new window creation
+        self.show_message_to_user(error_message)
+
+        print(error_message)
+
     def change_user_input(self):
         """
         Making sure each algorithm has it's own custom user inputs
@@ -202,11 +235,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # TODO: maybe the algorithm an material choice could stay, and
         #       only inputs themselves could be deleted and recreated
         # Clearing the whole layout and filling it again
-        self.clear_layout(self.verticalLayout)
+        self.clear_layout(self.verticalLayout_6)
 
-        self.add_algorithm_choice(self.verticalLayout, self.get_current_algorithm())
-        self.add_material_choice(self.verticalLayout)
-        self.add_user_inputs(self.verticalLayout)
+        self.add_algorithm_choice(self.verticalLayout_6, self.get_current_algorithm())
+        self.add_material_choice(self.verticalLayout_6)
+        self.add_user_inputs(self.verticalLayout_6)
 
     def add_algorithm_choice(self, parent_layout, specified_algorithm=None):
         """
@@ -298,8 +331,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             except ValueError:
                 parsed_value_from_user_in_SI = element["default_value"] * element["multiplicate_to_SI"]
                 getattr(self, element["input_name"]).setText(str(element["default_value"]))
-                # self.show_message_to_the_user("ERROR: Your {} was not a valid number! We gave it a default of {} {}.".format(
-                #     element["name"], element["default_value"], element["unit"]))
+                self.show_error_dialog_to_user("ERROR: Your {} was not a valid number! We gave it a default of {} {}.".format(
+                    element["name"], element["default_value"], element["unit"]))
 
             values_dictionary[element["variable_name"]] = parsed_value_from_user_in_SI
 
@@ -373,7 +406,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             return
 
         self.set_simulation_state("running")
-        self.error_label.setText("ERROR:")
+        self.error_label_2.setText("ERROR:")
         print("RUNNING THE SIMULATION")
         self.queue.put("WE HAVE JUST BEGAN!")
 
@@ -444,7 +477,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
             # Update the label to show latest time
             elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
-            self.time_label.setText("TIME: {} s".format(round(elapsed_time, 2)))
+            self.time_label_2.setText("TIME: {} s".format(round(elapsed_time, 2)))
         elif simulation_state == 0:
             # Handle transition from running to paused, otherwise do nothing
             if self.time_is_running == True:
@@ -452,7 +485,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
                 self.simulation_paused_timestamp = now
 
                 elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
-                self.time_label.setText("TIME: {} s".format(round(elapsed_time, 2)))
+                self.time_label_2.setText("TIME: {} s".format(round(elapsed_time, 2)))
 
     def process_output(self, returned_object):
         """
@@ -460,7 +493,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         print(returned_object)
         # TODO: create a function to change this error, and to colour it accordingly
-        self.error_label.setText("ERROR: {}".format(returned_object["error_value"]))
+        self.error_label_2.setText("ERROR: {}".format(returned_object["error_value"]))
 
     def lock_inputs_for_editing(self, lock=True):
         """
