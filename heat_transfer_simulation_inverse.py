@@ -7,6 +7,7 @@ It can be run separately or from the GUI, in which case it will be updating the 
 from NumericalInverse import *
 import csv
 import time
+import os
 
 class InverseCallback:
     """
@@ -171,6 +172,28 @@ class InverseTrial:
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
 
+    def save_results_to_csv_file(self, material="iron"):
+        """
+        Outputs the (semi)results of a simulation into a CSV file and names it
+            accordingly.
+        """
+        # TODO: discuss the possible filename structure
+        file_name = "Inverse-{}-{}C-{}s.csv".format(material, int(self.Sim.T_x0[0]),
+                                                    int(self.Sim.HeatFlux.x[-1]))
+
+        # If for some reason there was already the same file, rather not
+        #   overwrite it, but create a new file a timestamp as an identifier
+        if os.path.isfile(file_name):
+            file_name = file_name.split(".")[0] + "-" + str(int(time.time())) + ".csv"
+
+        with open(file_name, "w") as csv_file:
+            csv_writer = csv.writer(csv_file)
+            headers = ["Time [s]", "Temperature [C]"]
+            csv_writer.writerow(headers)
+
+            for time_value, temperature in zip(self.Sim.HeatFlux.x, self.Sim.HeatFlux.y):
+                csv_writer.writerow([time_value, temperature])
+
 
 def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
              amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
@@ -206,6 +229,7 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
     x = time.time()
     # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
     app.make_inverse_step()
+    app.save_results_to_csv_file()
 
     return {"error_value": app.ErrorNorm}
 

@@ -36,11 +36,7 @@ TODOS:
     - create a small window where to put important notices in the GUI
     - create some area where to show error messages to the user
         - or create a popup window with the same intent
-    - create the saving of images and CSV files as a result
-        - try to implement that in plot modules
-        - try extracting x and y data from the graph, so that we do not need
-            to store these data contiually
-            - or have them shipped from the simulation script, when it finishes
+    - discuss the formats and savings of csv and pgn results
     - find out how to make the left arguments-menu not occupy the whole height
     - add documentation to classes and functions
     - have an eye on speed - maybe it could even handle some multiprocessing
@@ -373,6 +369,10 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         else:
             self.set_simulation_state("finished")
 
+        # Saving the plots
+        self.temperature_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
+        self.heat_flux_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
+
     def pause_simulation(self):
         """
         What to do when simulation is paused
@@ -411,8 +411,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.queue.put("WE HAVE JUST BEGAN!")
 
         # Getting current material from GUI and it's peoperties from the service
-        current_material = self.material_combo_box.currentText()
-        current_material_properties = (material_service.materials_properties_dict[current_material])
+        self.chosen_material = self.material_combo_box.currentText()
+        current_material_properties = (material_service.materials_properties_dict[self.chosen_material])
 
         # Getting all other user input for the simulation
         parameters = self.get_numbers_from_the_user_input()
