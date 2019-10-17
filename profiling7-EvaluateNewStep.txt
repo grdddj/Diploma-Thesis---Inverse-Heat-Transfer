@@ -2,6 +2,23 @@ Very good job with the interpolation, you are about 5-times quicker than scipy!
   (I would guess they are not optimized for our purpose of evaluating values
   in the sequence from the beginning to the end, without any bigger jumps)
 
+We should consider to getting rid of the interpretations entirely.
+I think we would reach 80% time spend in spsolve in EvaluateNewStep.
+In the SolveInverseStep there is a lot of calls to EvaluateErrorNorm which relies
+on the Interpolations heavily. It would make it harder to implement adaptive time step
+but when calculating the inverse problem it should not be adaptive anyway... I think.
+
+If we do that we should.
+- Move the EvaluateNewStep into the simulation class and make the dt part of initialisation.
+- Rebuild all numerical part to work without interpolations and make it so it takes
+  the values from numpy arrays directly (basically interpolate only once during the initialisation
+  of the Simulation class).
+- Do the equivalent of the above to the NumericalInverse as well.
+- Then test the performance to see if it was worth the hassle..  I think it would speed up stuff significantly.
+
+If you wish to try so let me know. I would handle the numerical stuff and you should reflect the changes in the gui afterwards.
+
+
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    127                                           @profile
