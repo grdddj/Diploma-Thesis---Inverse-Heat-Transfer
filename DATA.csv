@@ -1,5 +1,5 @@
-Time,Temperature,HeatFlux,T_amb
-0,21.1339,1.3009,20.732
+Time,Temperature,HeatFlux,T_amb,Material_rho,Material_cp,Material_lmbd,Length,x0,RobinAlpha
+0,21.1339,1.3009,20.732,7850.0,490.0,13.5,0.01,0.00445,13.5
 3.189,21.1143,1.1495,20.7312
 4.239,21.1229,1.154,20.7314
 5.291,21.1117,1.2747,20.729

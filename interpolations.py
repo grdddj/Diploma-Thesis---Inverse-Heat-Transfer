@@ -1,5 +1,34 @@
 import numpy as np
-import random
+
+class Predefined_interp():
+    def __init__(self,x0,x):
+        self.indexes = self.Find_interp_indexes(x0,x)
+        self.n = len(self.indexes)
+        if self.n == 1:
+            self.x_diff_ratios = (x0-x[self.indexes[0]])/(x[self.indexes[0]+1] - x[self.indexes[0]])
+        else:
+            self.x_diff_ratios = [(x0[i]-x[self.indexes[i]])/(x[self.indexes[i]+1] - x[self.indexes[i]]) for i in range(self.n)]
+
+    def Find_interp_indexes(self,x0, x):
+        indexes = []
+        try:
+            len(x0)
+        except:
+            x0 = [x0]
+        for item_x0 in x0:
+            idx = 0
+            while x[idx] < item_x0:
+                idx += 1
+            indexes.append(idx-1)
+        return indexes
+
+class Predefined_interp_for_float(Predefined_interp):
+    def __call__(self,y):
+        return y[self.indexes[0]]+((y[self.indexes[0]+1] - y[self.indexes[0]])*self.x_diff_ratios)
+
+class Predefined_interp_for_list(Predefined_interp):
+    def __call__(self,y):
+        return [y[self.indexes[i]]+((y[self.indexes[i]+1] - y[self.indexes[i]])*self.x_diff_ratios[i]) for i in range(self.n)]
 
 class Interpolate_1D():
     def __init__(self, x, y, start_ahead_idx=0):
