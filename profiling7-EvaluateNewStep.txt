@@ -2,6 +2,8 @@ Very good job with the interpolation, you are about 5-times quicker than scipy!
   (I would guess they are not optimized for our purpose of evaluating values
   in the sequence from the beginning to the end, without any bigger jumps)
 
+
+
 We should consider to getting rid of the interpretations entirely.
 I think we would reach 80% time spend in spsolve in EvaluateNewStep.
 In the SolveInverseStep there is a lot of calls to EvaluateErrorNorm which relies
@@ -17,6 +19,14 @@ If we do that we should.
 - Then test the performance to see if it was worth the hassle..  I think it would speed up stuff significantly.
 
 If you wish to try so let me know. I would handle the numerical stuff and you should reflect the changes in the gui afterwards.
+
+
+
+I agree with trying this approach - in the worst case it will not work.
+In any case it will bring something to describe in the thesis, and increase
+  our knowledge and experience in this field.
+I will be ready to speedtest it and implement it into GUI anytime.
+
 
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
