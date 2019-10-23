@@ -14,6 +14,7 @@ RESULTS WORTH NOTING:
 """
 
 from NumericalForward import *
+import matplotlib.pyplot as plt
 import csv
 import time
 import os
@@ -54,13 +55,18 @@ class Trial():
         """
         self.loop_amount = 0
         while self.Sim.current_step_idx < self.Sim.max_step_idx:
-            self.Sim.EvaluateNewStep()  # evaluate Temperaures at step k
+            self.Sim.evaluate_one_step()  # evaluate Temperaures at step k
             self.MyCallBack.Call(self.Sim)
             self.loop_amount += 1
 
         self.ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.Sim.T_data))/len(self.Sim.t[1:])
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
+
+    def plot_all(self):
+        plt.plot(self.Sim.t, self.Sim.T_x0)
+        plt.plot(self.Sim.t, self.Sim.T_data)
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -110,3 +116,5 @@ if __name__ == '__main__':
         file.write("loop_amount: {}\n".format(app.loop_amount))
         file.write("dt: {}\n".format(app.Sim.dt))
         file.write("ErrorNorm: {}\n".format(app.ErrorNorm))
+
+    # app.plot_all()

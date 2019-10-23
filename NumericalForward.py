@@ -56,6 +56,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.T.fill(self.Exp_data.T_data[0])  # initialize temperature field
         self.T_checkpoint = np.empty(N+1)  # placeholder for temperatures saved in checkpoint
         self.T_x0 = len(self.t)*[0.0]  # Placeholder for temperature probes data
+        self.T_x0_checkpoint = len(self.t)*[0.0]  # Placeholder for temperature probes data
 
         # This way it does not spend any time on if statements during simulation
         try:
@@ -85,7 +86,8 @@ class Simulation:  # In later objects abreviated as Sim
         self.b = np.empty(N+1)  # allocate memory for vector b
 
     # Function that calculates new timestep (integration step)
-    def EvaluateNewStep(self):
+
+    def evaluate_one_step(self):
         # evaluate new boundary vector (BC means boundary condition)
         self.b = self.b_base.dot(self.T)  # Assemble vector b (dot() is matrix multiplication)
         self.b[0] += self.dt*(1-self.theta)*self.HeatFlux[self.current_step_idx]  # apply explicit portion of HeatFlux (Neumann BC 1st node)
@@ -100,14 +102,19 @@ class Simulation:  # In later objects abreviated as Sim
         self.current_step_idx += 1  # move to new timestep
         self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)
 
+    def evaluate_N_steps(self, N=1):
+        step = 0
+        while self.current_step_idx < self.max_step_idx and step < N:
+            self.evaluate_one_step()
+            step += 1
+
     def make_checkpoint(self):
         self.checkpoint_step_idx = self.current_step_idx
         self.T_checkpoint[:] = self.T[:]
 
     def revert_to_checkpoint(self):
+        self.current_step_idx = self.checkpoint_step_idx
         self.T[:] = self.T_checkpoint[:]
-        self.checkpoint_step_idx = self.current_step_idx
-        self.T_x0 = self.T_x0[0:self.checkpoint_step_idx]
 
 # This is quite dumm callback, but I guess you are going to change this part a lot
 # In forward simulation there perhaps does not have to be callback at all
