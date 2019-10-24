@@ -3,6 +3,27 @@ I will try to implement the changes into the Numerical Inverse as well first to 
 if something kicks back or not.
 
 
+
+Very nice results, I appreciate it!
+Agree that it can stay a branch on its own, until it will be fully functional,
+  and then we can compare the real benefits of these changes.
+
+I also noticed a big difference in absolute values of time needed to
+  run a specific line ("Per Hit" column) between your and mine profilings.
+It will be probably caused by the different performance of our machines
+  (your "supercomputer" and mine laptop).
+These differences are more than 25-fold (spsolve takes 1800 time units in my case
+  and only 67 in yours).
+This is a very nice example of two possible paths for the speed improvements:
+  a) the code optimization (soft solution)
+  b) the hardware optimization (brute force solution)
+  - usually it is advised to start with the hardware optimization, because it
+      is generally cheaper (as development time is quite expensive), and
+      enables the code to be as understandable as possible (as speed improvements
+      in the code usually mean it becomes less readable)
+
+
+
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
     88                                               @profile

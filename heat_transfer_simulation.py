@@ -54,19 +54,20 @@ class NewCallback:
 
         """
         # Update the time calculation is in progress
-        if Sim.t[-1] > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
+        if Sim.current_t > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
-                self.temperature_plot.plot(x_values=Sim.t[1:],
-                                         y_values=Sim.T_x0,
-                                         x_experiment_values=self.ExperimentData["time"],
-                                         y_experiment_values=self.ExperimentData["temperature"])
+                # Sending only the data that is already calculated
+                self.temperature_plot.plot(x_values=Sim.t[:Sim.current_step_idx],
+                                         y_values=Sim.T_x0[:Sim.current_step_idx],
+                                         x_experiment_values=Sim.Exp_data.t_data,
+                                         y_experiment_values=Sim.Exp_data.T_data)
 
             # Plotting the heat flux graph at the very beginning and marking it done
             if not self.heat_flux_already_plotted and self.heat_flux_plot is not None:
                 self.heat_flux_plot.plot(x_values=None,
                                          y_values=None,
-                                         x_experiment_values=self.ExperimentData["time"],
-                                         y_experiment_values=self.ExperimentData["heat_flux"])
+                                         x_experiment_values=Sim.Exp_data.t_data,
+                                         y_experiment_values=Sim.Exp_data.q_data)
                 self.heat_flux_already_plotted = True
 
             # If callback is defined, emit positive value to increment time in GUI
@@ -112,54 +113,30 @@ class Trial():
         """
 
         """
-        t_data = []  # experimental data of time points
-        T_data = []  # experimental data of temperature data at x0=0.008
-        q_data = []  # experimental data of Measured HeatFluxes at left boundary
-        T_amb_data = []  # experimental data of ambinet temperature
-
-        # read from datafile (might look like this)
-        with open('DATA.csv') as csvDataFile:
-            csvReader = csv.reader(csvDataFile)
-            next(csvReader, None)  # skip first line (headers)
-            for row in csvReader:
-                t_data.append(float(row[0]))
-                T_data.append(float(row[1]))
-                q_data.append(float(row[2]))
-                T_amb_data.append(float(row[3]))
-
-        q_experiment = MakeDataCallable(t_data, q_data)  # colapse data into callable function q_experiment(t)
-        self.T_experiment = MakeDataCallable(t_data, T_data)  # colapse data into callable function T_experiment(t)
-        T_amb = MakeDataCallable(t_data, T_amb_data)  # colapse data into callable function T_amb(t)
-        # Look into NumericalForward.py for details
-
-        ExperimentData = {
-            "time": t_data,
-            "temperature": T_data,
-            "heat_flux": q_data
-        }
-
         # This  is how the experiment recorded in DATA.csv was aproximately done
-        my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
-        self.Sim = Simulation(Length=parameters["object_length"],
-                              Material=my_material,
-                              N=parameters["number_of_elements"],
-                              HeatFlux=q_experiment,
-                              AmbientTemperature=T_amb,
-                              RobinAlpha=13.5,
-                              x0=parameters["place_of_interest"])
+        # my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
+        # self.Sim = Simulation(Length=parameters["object_length"],
+        #                       material=my_material,
+        #                       N=parameters["number_of_elements"],
+        #                       HeatFlux=q_experiment,
+        #                       AmbientTemperature=T_amb,
+        #                       RobinAlpha=13.5,
+        #                       x0=parameters["place_of_interest"])
+
+        self.Sim = Simulation()
 
         self.MyCallBack = NewCallback(progress_callback=progress_callback,
                                       Call_at=parameters["callback_period"],
                                       temperature_plot=temperature_plot,
                                       heat_flux_plot=heat_flux_plot,
-                                      queue=queue,
-                                      ExperimentData=ExperimentData)
-        self.dt = parameters["dt"]
-        self.t_start = t_data[0]
-        self.t_stop = t_data[-1]-1
-        self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
-        self.Sim.T.fill(T_data[0])  # fill initial temperature with value of T0
-        self.Sim.T_record.append(self.Sim.T)  # save initial step
+                                      queue=queue)
+                                      # ExperimentData=ExperimentData)
+        # self.dt = parameters["dt"]
+        # self.t_start = t_data[0]
+        # self.t_stop = t_data[-1]-1
+        # self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
+        # self.Sim.T.fill(T_data[0])  # fill initial temperature with value of T0
+        # self.Sim.T_record.append(self.Sim.T)  # save initial step
 
         return True
 
@@ -167,13 +144,12 @@ class Trial():
         """
 
         """
-        while self.Sim.t[-1] < self.t_stop:
+        while self.Sim.current_step_idx < self.Sim.max_step_idx:
             # Processing the callback and getting the simulation state at the same time
             # Then acting accordingly to the current state
             simulation_state = self.MyCallBack.Call(self.Sim)
             if simulation_state == "running":
-                dt = min(self.dt, self.t_stop-self.Sim.t[-1])  # checking if not surpassing t_stop
-                EvaluateNewStep(self.Sim, dt, 0.5)  # evaluate Temperaures at step k
+                self.Sim.evaluate_one_step()
             elif simulation_state == "paused":
                 time.sleep(0.1)
             elif simulation_state == "stopped":
@@ -183,7 +159,7 @@ class Trial():
         # Calling callback at the very end, to update the plot with complete results
         self.MyCallBack.Call(self.Sim, force_update=True)
 
-        self.ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.T_experiment(self.Sim.t[1:])))/len(self.Sim.t[1:])
+        self.ErrorNorm = np.sum(abs(self.Sim.T_x0 - self.Sim.T_data))/len(self.Sim.t[1:])
         self.ErrorNorm = round(self.ErrorNorm, 3)
         print("Error norm: {}".format(self.ErrorNorm))
 
@@ -284,4 +260,4 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
     return {"error_value": app.ErrorNorm}
 
 if __name__ == '__main__':
-    run_test(amount_of_trials=5, SCENARIO_DESCRIPTION="SpeedTest")
+    run_test(amount_of_trials=2, SCENARIO_DESCRIPTION="SpeedTest")

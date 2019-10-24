@@ -34,12 +34,17 @@ class Simulation:  # In later objects abreviated as Sim
     theta = 1.0 - fully implicit 1st order, numerically stable.
     """
 
-    def __init__(self, N=100, dt=1.0, theta=0.5, experiment_data_path="DATA.csv"):
+    def __init__(self, N=100, dt=1.0, theta=0.5, experiment_data_path="DATA.csv", material=None):
         self.N = int(N)  # number of elements in the model
         self.dt = dt  # fixed time step
         self.theta = theta  # fixed integration method
         self.Exp_data = Experimental_data(experiment_data_path)
+        # Material properties can be either chosen (in GUI), or defined in a CSV
+        self.rho = material.rho if material is not None else self.Exp_data.Mat.rho
+        self.cp = material.cp if material is not None else self.Exp_data.Mat.cp
+        self.lmbd = material.lmbd if material is not None else self.Exp_data.Mat.lmbd
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)  # Placeholder for the fixed simulation time points
+        self.current_t = 0 # Storing current time for quick lookup in the callback
         self.max_step_idx = len(self.t) - 1  # maximum allowed index when simulating
         self.current_step_idx = 0  # current time step index
         self.checkpoint_step_idx = 0  # checkpoint time step index
@@ -70,10 +75,10 @@ class Simulation:  # In later objects abreviated as Sim
         # Finite element method: matrix assembly using 1st order continuous Galerkin elements
         # Tridiagonal sparse mass matrix (contains information about heat capacity of the elements and how their temperatures react to incoming heat)
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html
-        self.M = csr_matrix(self.dx*self.Exp_data.Mat.rho*self.Exp_data.Mat.cp*diags([1/6, 4/6, 1/6], [-1, 0, 1], shape=(N+1, N+1)))
+        self.M = csr_matrix(self.dx*self.rho*self.cp*diags([1/6, 4/6, 1/6], [-1, 0, 1], shape=(N+1, N+1)))
 
         # Tridiagonal sparse stiffness matrix (contains information about heat conductivity and how the elements affect each other)
-        self.K = csr_matrix((1/self.dx)*self.Exp_data.Mat.lmbd*diags([-1, 2, -1], [-1, 0, 1], shape=(N+1, N+1)))
+        self.K = csr_matrix((1/self.dx)*self.lmbd*diags([-1, 2, -1], [-1, 0, 1], shape=(N+1, N+1)))
 
         # We have to make some changes to the matrix K because we affect the body from outside
         self.K[0,0] /= 2  # Here we will push Heat to the body - Neumann Boundary Condition
@@ -101,6 +106,7 @@ class Simulation:  # In later objects abreviated as Sim
         #self.T_x0.append(np.interp(self.Exp_data.x0, self.x, self.T))  # save data from the temperature probes  # switich off for now
         self.current_step_idx += 1  # move to new timestep
         self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)
+        self.current_t += self.dt
 
     def evaluate_N_steps(self, N=1):
         step = 0
