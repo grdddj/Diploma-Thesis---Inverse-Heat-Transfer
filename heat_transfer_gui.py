@@ -525,8 +525,8 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     heat_transfer_window = HeatTransferWindow()
 
-    heat_transfer_window.showMaximized()
+    # heat_transfer_window.showMaximized()
     # heat_transfer_window.resize(1000, 500)
-    # heat_transfer_window.show()
+    heat_transfer_window.show()
 
     sys.exit(app.exec_())

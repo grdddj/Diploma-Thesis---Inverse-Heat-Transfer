@@ -18,8 +18,9 @@ class InverseCallback:
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
 
-        default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
-        self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
+        # TODO: decide whether to use experiment data from Sim all the time, or to initialize them here
+        # default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
+        # self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
 
         # Takes reference of some plot, which it should update, and some queue,
         #   through which the GUI will send information.
@@ -38,20 +39,20 @@ class InverseCallback:
 
         """
         # Update the time calculation is in progress
-        if Sim.t[-1] > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
+        if Sim.current_t > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
-                self.temperature_plot.plot(x_values=Sim.t[1:],
-                                         y_values=Sim.T_x0,
-                                         x_experiment_values=self.ExperimentData["time"],
-                                         y_experiment_values=self.ExperimentData["temperature"])
+                self.temperature_plot.plot(x_values=Sim.t[:Sim.current_step_idx],
+                                         y_values=Sim.T_x0[:Sim.current_step_idx],
+                                         x_experiment_values=Sim.Exp_data.t_data,
+                                         y_experiment_values=Sim.Exp_data.T_data)
 
             if self.heat_flux_plot is not None:
                 # Showing only the already calculated part of the heat flux
-                calculated_length = len(Sim.T_x0)
-                self.heat_flux_plot.plot(x_values=Sim.HeatFlux.x[:calculated_length],
-                                         y_values=Sim.HeatFlux.y[:calculated_length],
-                                         x_experiment_values=self.ExperimentData["time"],
-                                         y_experiment_values=self.ExperimentData["heat_flux"])
+                # calculated_length = len(Sim.T_x0)
+                self.heat_flux_plot.plot(x_values=Sim.t[:Sim.current_step_idx],
+                                         y_values=Sim.HeatFlux[:Sim.current_step_idx],
+                                         x_experiment_values=Sim.Exp_data.t_data,
+                                         y_experiment_values=Sim.Exp_data.q_data)
 
             # If callback is defined, emit positive value to increment time in GUI
             if self.progress_callback is not None:
@@ -96,64 +97,34 @@ class InverseTrial:
         """
 
         """
-        self.t_data = []  # experimental data of time points
-        self.T_data = []  # experimental data of temperature data at x0=0.008
-        self.q_data = []  # experimental data of Measured HeatFluxes at left boundary
-        T_amb_data = []  # experimental data of ambinet temperature
-
-        # read from datafile (might look like this)
-        with open('DATA.csv') as csvDataFile:
-            csvReader = csv.reader(csvDataFile)
-            next(csvReader, None)  # skip first line (headers)
-            for row in csvReader:
-                self.t_data.append(float(row[0]))
-                self.T_data.append(float(row[1]))
-                self.q_data.append(float(row[2]))
-                T_amb_data.append(float(row[3]))
-
-        self.q_experiment = MakeDataCallable(self.t_data, self.q_data)  # colapse data into callable function test_q(t)
-        T_experiment = MakeDataCallable(self.t_data, self.T_data)  # colapse data into callable function T_experiment(t)
-        T_amb = MakeDataCallable(self.t_data, T_amb_data)  # colapse data into callable function T_amb(t)
-        # Look into NumericalForward.py for details
-
-        ExperimentData = {
-            "time": self.t_data,
-            "temperature": self.T_data,
-            "heat_flux": self.q_data
-        }
-
-        self.window_span = parameters["window_span"]
-
         my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
-        self.Sim = Simulation(Length=parameters["object_length"],
-                              Material=my_material,
+        self.Sim = Simulation(length=parameters["object_length"],
+                              material=my_material,
                               N=parameters["number_of_elements"],
-                              HeatFlux=self.q_experiment,
-                              AmbientTemperature=T_amb,
-                              RobinAlpha=10.5,
+                              theta=parameters["theta"],
+                              robin_alpha=parameters["robin_alpha"],
+                              dt=parameters["dt"],
                               x0=parameters["place_of_interest"])
 
         self.Problem = InverseProblem(self.Sim,
-                                      dt=parameters["dt"],
-                                      data_T=T_experiment)
+                                      q_init=20,
+                                      window_span=parameters["window_span"])
 
         self.MyCallBack = InverseCallback(progress_callback=progress_callback,
                                           Call_at=parameters["callback_period"],
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
-                                          queue=queue,
-                                          ExperimentData=ExperimentData)
-
+                                          queue=queue)
     def make_inverse_step(self):
         """
 
         """
-        while self.Problem.Sim.t[-1] < self.t_data[-1]-100:
+        while self.Problem.Sim.current_step_idx < self.Problem.Sim.max_step_idx:
             # Processing the callback and getting the simulation state at the same time
             # Then acting accordingly to the current state
             simulation_state = self.MyCallBack.Call(self.Sim)
             if simulation_state == "running":
-                SolveInverseStep(self.Problem, window_span=self.window_span, tolerance=1e-6)
+                self.Problem.evaluate_one_inverse_step()
             elif simulation_state == "paused":
                 import random
                 if random.random() < 0.1:
@@ -167,9 +138,11 @@ class InverseTrial:
         self.MyCallBack.Call(self.Problem.Sim, force_update=True)
 
         # TODO: review this, as it might not be correct
-        heat_flux_length = len(self.Sim.t)
-        self.ErrorNorm = np.sum(abs(self.Problem.Sim.HeatFlux.y[:heat_flux_length] - self.q_experiment(self.Sim.t)))/heat_flux_length
-        self.ErrorNorm = round(self.ErrorNorm, 3)
+        # TODO: think of some way how to calculate this error
+        # heat_flux_length = len(self.Sim.t)
+        # self.ErrorNorm = np.sum(abs(self.Problem.Sim.HeatFlux[:heat_flux_length] - self.Problem.Sim.Exp_data.q_data))/heat_flux_length
+        # self.ErrorNorm = round(self.ErrorNorm, 3)
+        self.ErrorNorm = "unknown"
         print("Error norm: {}".format(self.ErrorNorm))
 
     def save_results_to_csv_file(self, material="iron"):
@@ -179,7 +152,7 @@ class InverseTrial:
         """
         # TODO: discuss the possible filename structure
         file_name = "Inverse-{}-{}C-{}s.csv".format(material, int(self.Sim.T_x0[0]),
-                                                    int(self.Sim.HeatFlux.x[-1]))
+                                                    int(self.Sim.t[-1]))
 
         # If for some reason there was already the same file, rather not
         #   overwrite it, but create a new file a timestamp as an identifier
@@ -191,7 +164,7 @@ class InverseTrial:
             headers = ["Time [s]", "Temperature [C]"]
             csv_writer.writerow(headers)
 
-            for time_value, temperature in zip(self.Sim.HeatFlux.x, self.Sim.HeatFlux.y):
+            for time_value, temperature in zip(self.Sim.t, self.Sim.HeatFlux):
                 csv_writer.writerow([time_value, temperature])
 
 
@@ -217,7 +190,9 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
             "place_of_interest": 0.0045,
             "number_of_elements": 100,
             "callback_period": 500,
-            "window_span": 2
+            "window_span": 2,
+            "robin_alpha": 13.5,
+            "theta": 0.5
         }
 
     app.PrepareSimulation(progress_callback=progress_callback,
@@ -231,17 +206,17 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
     app.make_inverse_step()
     app.save_results_to_csv_file()
 
-    return {"error_value": app.ErrorNorm}
-
     # fig1 = plt.figure()
-    # plt.plot(app.t_data, app.q_data)
-    # plt.plot(app.Problem.Sim.HeatFlux.x, app.Problem.Sim.HeatFlux.y)
+    # plt.plot(app.Problem.Sim.Exp_data.t_data, app.Problem.Sim.Exp_data.q_data)
+    # plt.plot(app.Problem.Sim.t, app.Problem.Sim.HeatFlux)
     #
     # fig2 = plt.figure()
-    # plt.plot(app.t_data, app.T_data)
+    # plt.plot(app.Problem.Sim.Exp_data.t_data, app.Problem.Sim.Exp_data.T_data)
     # plt.plot(app.Problem.Sim.t, app.Problem.Sim.T_x0)
     #
     # plt.show()
+
+    return {"error_value": app.ErrorNorm}
 
 if __name__ == '__main__':
     run_test()

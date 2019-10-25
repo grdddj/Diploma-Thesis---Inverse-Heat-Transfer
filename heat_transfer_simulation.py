@@ -30,8 +30,9 @@ class NewCallback:
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
 
-        default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
-        self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
+        # TODO: decide whether to use experiment data from Sim all the time, or to initialize them here
+        # default_ExperimentData = {"time": None, "temperature": None, "heat_flux": None}
+        # self.ExperimentData = ExperimentData if ExperimentData is not None else default_ExperimentData
 
         # Takes reference of some plot, which it should update, and some queue,
         #   through which the GUI will send information.
@@ -113,31 +114,21 @@ class Trial():
         """
 
         """
-        # This  is how the experiment recorded in DATA.csv was aproximately done
-        # my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
-        # self.Sim = Simulation(Length=parameters["object_length"],
-        #                       material=my_material,
-        #                       N=parameters["number_of_elements"],
-        #                       HeatFlux=q_experiment,
-        #                       AmbientTemperature=T_amb,
-        #                       RobinAlpha=13.5,
-        #                       x0=parameters["place_of_interest"])
 
-        self.Sim = Simulation()
+        my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
+        self.Sim = Simulation(length=parameters["object_length"],
+                              material=my_material,
+                              N=parameters["number_of_elements"],
+                              theta=parameters["theta"],
+                              robin_alpha=parameters["robin_alpha"],
+                              dt=parameters["dt"],
+                              x0=parameters["place_of_interest"])
 
         self.MyCallBack = NewCallback(progress_callback=progress_callback,
                                       Call_at=parameters["callback_period"],
                                       temperature_plot=temperature_plot,
                                       heat_flux_plot=heat_flux_plot,
                                       queue=queue)
-                                      # ExperimentData=ExperimentData)
-        # self.dt = parameters["dt"]
-        # self.t_start = t_data[0]
-        # self.t_stop = t_data[-1]-1
-        # self.Sim.t.append(0.0)  # push start time into time placeholder inside Simulation class
-        # self.Sim.T.fill(T_data[0])  # fill initial temperature with value of T0
-        # self.Sim.T_record.append(self.Sim.T)  # save initial step
-
         return True
 
     def make_sim_step(self):
@@ -206,7 +197,9 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
             "object_length": 0.01,
             "place_of_interest": 0.0045,
             "number_of_elements": 100,
-            "callback_period": 500
+            "callback_period": 500,
+            "robin_alpha": 13.5,
+            "theta": 0.5
         }
 
     now = time.time()

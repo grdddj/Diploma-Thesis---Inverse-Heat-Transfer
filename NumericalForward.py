@@ -6,7 +6,7 @@
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
 from scipy.sparse.linalg import spsolve    # this guy can solve equation faster by taking advantage of the sparsity (it ignores zeros in the matrices)
-from experiment_data_handler import Experimental_data
+from experiment_data_handler import Experimental_data, Material
 from interpolations import Predefined_interp_for_float, Predefined_interp_for_list
 import matplotlib.pyplot as plt  # some ploting backend - but you can change to whatever you need
 
@@ -34,15 +34,22 @@ class Simulation:  # In later objects abreviated as Sim
     theta = 1.0 - fully implicit 1st order, numerically stable.
     """
 
-    def __init__(self, N=100, dt=1.0, theta=0.5, experiment_data_path="DATA.csv", material=None):
+    def __init__(self, N=100, dt=1.0, theta=0.5, experiment_data_path="DATA.csv",
+                 material=None, robin_alpha=None, x0=None, length=None):
         self.N = int(N)  # number of elements in the model
         self.dt = dt  # fixed time step
         self.theta = theta  # fixed integration method
         self.Exp_data = Experimental_data(experiment_data_path)
-        # Material properties can be either chosen (in GUI), or defined in a CSV
+
+        # A lot of properties can be either chosen (in GUI), or defined in a CSV
+        # TODO: let user choose one or another, at least in material
         self.rho = material.rho if material is not None else self.Exp_data.Mat.rho
         self.cp = material.cp if material is not None else self.Exp_data.Mat.cp
         self.lmbd = material.lmbd if material is not None else self.Exp_data.Mat.lmbd
+        self.length = length if length is not None else self.Exp_data.Length
+        self.robin_alpha = robin_alpha if robin_alpha is not None else self.Exp_data.RobinAlpha
+        self.x0 = x0 if x0 is not None else self.Exp_data.x0
+
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)  # Placeholder for the fixed simulation time points
         self.current_t = 0 # Storing current time for quick lookup in the callback
         self.max_step_idx = len(self.t) - 1  # maximum allowed index when simulating
@@ -51,9 +58,9 @@ class Simulation:  # In later objects abreviated as Sim
         self.T_data = np.interp(self.t, self.Exp_data.t_data, self.Exp_data.T_data)
         self.HeatFlux = np.interp(self.t, self.Exp_data.t_data, self.Exp_data.q_data)  # Placeholder for interpolated heat_flux
         self.T_amb = np.interp(self.t, self.Exp_data.t_data, self.Exp_data.T_amb_data)  # Placeholder for interpolated ambient temperature
-        self.dx = self.Exp_data.Length/N  # size of one element
+        self.dx = self.length/N  # size of one element
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.linspace.html
-        self.x = np.linspace(0, self.Exp_data.Length, N+1)  # x-positions of the nodes (temperatures)
+        self.x = np.linspace(0, self.length, N+1)  # x-positions of the nodes (temperatures)
 
         # temperature fields
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.empty.html
@@ -65,10 +72,10 @@ class Simulation:  # In later objects abreviated as Sim
 
         # This way it does not spend any time on if statements during simulation
         try:
-            len(self.Exp_data.x0)
-            self.T_x0_interpolator = Predefined_interp_for_list(self.Exp_data.x0, self.x)
+            len(self.x0)
+            self.T_x0_interpolator = Predefined_interp_for_list(self.x0, self.x)
         except:
-            self.T_x0_interpolator = Predefined_interp_for_float(self.Exp_data.x0, self.x)
+            self.T_x0_interpolator = Predefined_interp_for_float(self.x0, self.x)
         self.T_x0[0] = self.T_x0_interpolator(self.T)  # save initial T_x0
         # TODO: make it allow multiple probes at the same time
 
@@ -86,7 +93,7 @@ class Simulation:  # In later objects abreviated as Sim
 
         # Preparing variables to store the values of some properties, that are constant during the simulation
         self.A = self.M + self.dt*self.theta*self.K  # placeholder for matrix A
-        self.A[-1,-1] += self.dt*self.theta*self.Exp_data.RobinAlpha  # implicit portion of T_body contribution (Robin BC Nth node)
+        self.A[-1,-1] += self.dt*self.theta*self.robin_alpha  # implicit portion of T_body contribution (Robin BC Nth node)
         self.b_base = self.M - self.dt*(1-self.theta)*self.K  # Matrix b to calculate boundary vector b
         self.b = np.empty(N+1)  # allocate memory for vector b
 
@@ -97,9 +104,9 @@ class Simulation:  # In later objects abreviated as Sim
         self.b = self.b_base.dot(self.T)  # Assemble vector b (dot() is matrix multiplication)
         self.b[0] += self.dt*(1-self.theta)*self.HeatFlux[self.current_step_idx]  # apply explicit portion of HeatFlux (Neumann BC 1st node)
         self.b[0] += self.dt*self.theta*self.HeatFlux[self.current_step_idx+1]  # apply implicit portion of HeatFlux (Neumann BC 1st node)
-        self.b[-1] -= self.dt*(1-self.theta)*self.Exp_data.RobinAlpha*self.T[-1]  # apply explicit contribution of the body temperature (Robin BC Nth node)
-        self.b[-1] += self.dt*(1-self.theta)*self.Exp_data.RobinAlpha*self.T_amb[self.current_step_idx]  # apply explicit contribution of the ambient temperature (Robin BC Nth node)
-        self.b[-1] += self.dt*self.theta*self.Exp_data.RobinAlpha*self.T_amb[self.current_step_idx+1]  # apply implicit contribution of the ambient temperature (Robin BC Nth node)
+        self.b[-1] -= self.dt*(1-self.theta)*self.robin_alpha*self.T[-1]  # apply explicit contribution of the body temperature (Robin BC Nth node)
+        self.b[-1] += self.dt*(1-self.theta)*self.robin_alpha*self.T_amb[self.current_step_idx]  # apply explicit contribution of the ambient temperature (Robin BC Nth node)
+        self.b[-1] += self.dt*self.theta*self.robin_alpha*self.T_amb[self.current_step_idx+1]  # apply implicit contribution of the ambient temperature (Robin BC Nth node)
 
         # solve the equation self.A*self.T=b
         self.T = spsolve(self.A, self.b)  # solve new self.T for the new step
