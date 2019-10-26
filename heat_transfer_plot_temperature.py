@@ -66,15 +66,20 @@ class TemperaturePlotCanvas(FigureCanvas):
 
         # Getting the data from plot - to inuquely identify the plot condition
         # (for the complete plot being different from non-complete one)
-        lines = self.figure.gca().get_lines()
-        time_data = lines[0].get_data()[0]
-        flux_data = lines[0].get_data()[1]
+        try:
+            lines = self.figure.gca().get_lines()
+            time_data = lines[0].get_data()[0]
+            flux_data = lines[0].get_data()[1]
 
-        file_name = "Temperature-{}-{}-{}s.png".format(method, material, int(time_data[-1]))
+            file_name = "Temperature-{}-{}-{}s.png".format(method, material, int(time_data[-1]))
 
-        # If for some reason there was already the same file, rather not
-        #   overwrite it, but create a new file a timestamp as an identifier
-        if os.path.isfile(file_name):
-            file_name = file_name.split(".")[0] + "-" + str(int(time.time())) + ".png"
+            # If for some reason there was already the same file, rather not
+            #   overwrite it, but create a new file a timestamp as an identifier
+            if os.path.isfile(file_name):
+                file_name = file_name.split(".")[0] + "-" + str(int(time.time())) + ".png"
 
-        self.fig.savefig(file_name)
+            self.fig.savefig(file_name)
+        except IndexError:
+            # IndexError happens when there is no calculated data yet
+            # (When user clicks STOP button right after RUN button)
+            pass

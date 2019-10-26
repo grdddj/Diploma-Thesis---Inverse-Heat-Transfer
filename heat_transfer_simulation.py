@@ -55,7 +55,7 @@ class NewCallback:
 
         """
         # Update the time calculation is in progress
-        if Sim.current_t > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
+        if Sim.current_t_forward > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
                 # Sending only the data that is already calculated
                 self.temperature_plot.plot(x_values=Sim.t[:Sim.current_step_idx],

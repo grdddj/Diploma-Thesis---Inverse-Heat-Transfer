@@ -39,7 +39,7 @@ class InverseCallback:
 
         """
         # Update the time calculation is in progress
-        if Sim.current_t > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
+        if Sim.current_t_inverse > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
                 self.temperature_plot.plot(x_values=Sim.t[:Sim.current_step_idx],
                                          y_values=Sim.T_x0[:Sim.current_step_idx],
@@ -138,11 +138,19 @@ class InverseTrial:
         self.MyCallBack.Call(self.Problem.Sim, force_update=True)
 
         # TODO: review this, as it might not be correct
-        # TODO: think of some way how to calculate this error
-        # heat_flux_length = len(self.Sim.t)
-        # self.ErrorNorm = np.sum(abs(self.Problem.Sim.HeatFlux[:heat_flux_length] - self.Problem.Sim.Exp_data.q_data))/heat_flux_length
-        # self.ErrorNorm = round(self.ErrorNorm, 3)
-        self.ErrorNorm = "unknown"
+        calculated_heatflux = self.Problem.Sim.HeatFlux
+        experiment_heatflux = np.interp(self.Sim.t, self.Sim.Exp_data.t_data, self.Sim.Exp_data.q_data)
+
+        # Determining the shorter length, to unify the sizes
+        min_length = min(len(calculated_heatflux), len(experiment_heatflux))
+
+        try:
+            self.ErrorNorm = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
+            self.ErrorNorm = round(self.ErrorNorm, 3)
+        except ValueError:
+            # This is raised when the lengths of compared lists are not the same (for some reason)
+            self.ErrorNorm = "unknown"
+
         print("Error norm: {}".format(self.ErrorNorm))
 
     def save_results_to_csv_file(self, material="iron"):

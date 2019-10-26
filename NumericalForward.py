@@ -51,7 +51,8 @@ class Simulation:  # In later objects abreviated as Sim
         self.x0 = x0 if x0 is not None else self.Exp_data.x0
 
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)  # Placeholder for the fixed simulation time points
-        self.current_t = 0 # Storing current time for quick lookup in the callback
+        self.current_t_forward = 0 # Storing current time for quick lookup in the forward callback
+        self.current_t_inverse = 0 # Storing current time for quick lookup in the inverse callback
         self.max_step_idx = len(self.t) - 1  # maximum allowed index when simulating
         self.current_step_idx = 0  # current time step index
         self.checkpoint_step_idx = 0  # checkpoint time step index
@@ -113,7 +114,7 @@ class Simulation:  # In later objects abreviated as Sim
         #self.T_x0.append(np.interp(self.Exp_data.x0, self.x, self.T))  # save data from the temperature probes  # switich off for now
         self.current_step_idx += 1  # move to new timestep
         self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)
-        self.current_t += self.dt
+        self.current_t_forward += self.dt # Updating time info for the callback
 
     def evaluate_N_steps(self, N=1):
         step = 0

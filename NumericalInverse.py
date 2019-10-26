@@ -37,7 +37,7 @@ class InverseProblem():  # later abbreviated as Prob
             if abs(prev_Error - new_Error) < self.tolerance:
                 self.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
                 self.Sim.evaluate_one_step()  # make one step only
-                #print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (self.Sim.HeatFlux[self.current_q_idx], self.Sim.t[self.current_q_idx], new_Error, iter))
+                # print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (self.Sim.HeatFlux[self.current_q_idx], self.Sim.t[self.current_q_idx], new_Error, iter))
                 break  # this Flux seems to be ok so stop adjusting it
             elif new_Error < prev_Error:
 
@@ -52,3 +52,4 @@ class InverseProblem():  # later abbreviated as Prob
             self.Sim.HeatFlux[self.current_q_idx] += q_adj  # adjust heatflux a little in the explicit portion
             self.Sim.HeatFlux[self.current_q_idx+1] += q_adj  # adjust heatflux a little in the implicit portion
         self.current_q_idx += 1  # since the current flux is adjusted enough tell the Prob to adjust next one in next SolveInverseStep call
+        self.Sim.current_t_inverse += self.Sim.dt # Updating time info for the callback
