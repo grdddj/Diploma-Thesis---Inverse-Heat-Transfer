@@ -23,6 +23,22 @@ This is a very nice example of two possible paths for the speed improvements:
       in the code usually mean it becomes less readable)
 
 
+After fully implementing both the classic and inverse algorithm in GUI to the new
+  approach, I can share the results I came up with:
+  - I like the readability of the new code (for example the experiment data
+      being put into a new module)
+  - The classic algorithm is faster both on the paper and in the GUI, when compared
+      with the previous solution
+  - The inverse is very fast on paper, but in the GUI it is sometimes even slower
+      than the previous one.
+      - I ran the profilings, and all seems to be fine there, so I am not sure about
+          the cause, will investigate it further
+      - However, the speed worsening (if any) is almost neglectable, and I did not
+          run any real tests (just visual ones), so it could be a coincidence
+  - I will be happy to merge it soon, after we agree on it (really the only
+      "objection" I have is the last abovementioned point)
+
+
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
