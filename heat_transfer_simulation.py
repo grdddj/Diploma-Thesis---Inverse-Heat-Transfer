@@ -210,7 +210,8 @@ class Trial():
                 csv_writer.writerow([time_value, temperature])
 
 def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
-             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
+             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None,
+             save_results=False):
     """
 
     """
@@ -251,7 +252,8 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
         z = time.time()
         print("make_sim_step: {}".format(round(z - y, 3)))
         # progress_callback.emit("ggf")
-        app.save_results_to_csv_file()
+        if save_results:
+            app.save_results_to_csv_file()
 
     print(80*"*")
 

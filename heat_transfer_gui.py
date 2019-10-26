@@ -113,6 +113,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle("Heat transfer")
 
         # Filling the left side with user choice and inputs
+        self.add_saving_choices(self.verticalLayout_6)
         self.add_algorithm_choice(self.verticalLayout_6)
         self.add_material_choice(self.verticalLayout_6)
         self.add_user_inputs(self.verticalLayout_6)
@@ -233,9 +234,24 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # Clearing the whole layout and filling it again
         self.clear_layout(self.verticalLayout_6)
 
+        self.add_saving_choices(self.verticalLayout_6)
         self.add_algorithm_choice(self.verticalLayout_6, self.get_current_algorithm())
         self.add_material_choice(self.verticalLayout_6)
         self.add_user_inputs(self.verticalLayout_6)
+
+    def add_saving_choices(self, parent_layout):
+        """
+        Including the checkboxes for user to choose if to save data or not
+        """
+        new_layout = QtWidgets.QHBoxLayout()
+
+        self.save_plots_checkbox = QtWidgets.QCheckBox("Save plots")
+        self.save_data_checkbox = QtWidgets.QCheckBox("Save data")
+
+        new_layout.addWidget(self.save_plots_checkbox)
+        new_layout.addWidget(self.save_data_checkbox)
+
+        parent_layout.addLayout(new_layout)
 
     def add_algorithm_choice(self, parent_layout, specified_algorithm=None):
         """
@@ -370,8 +386,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             self.set_simulation_state("finished")
 
         # Saving the plots
-        self.temperature_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
-        self.heat_flux_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
+        if self.save_plots_checkbox.isChecked():
+            self.temperature_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
+            self.heat_flux_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
 
     def pause_simulation(self):
         """
@@ -437,7 +454,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             "temperature_plot": self.temperature_plot,
             "heat_flux_plot": self.heat_flux_plot,
             "queue": self.queue,
-            "parameters": parameters
+            "parameters": parameters,
+            "save_results": self.save_data_checkbox.isChecked()
         }
 
         # Running the specific simulation
