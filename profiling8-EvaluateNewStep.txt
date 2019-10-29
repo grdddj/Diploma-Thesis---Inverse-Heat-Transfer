@@ -38,6 +38,13 @@ After fully implementing both the classic and inverse algorithm in GUI to the ne
   - I will be happy to merge it soon, after we agree on it (really the only
       "objection" I have is the last abovementioned point)
 
+The Inverse was slower because in the master branch there was tolerance set to 1e-6.
+  while in this branch it was set to 1e-8. So it did more inner iterations before accepting the fluxes.
+  I found that out by uncommenting the conveniently present print line in the inverse evaluation loop.
+  I it showed about double the amount of inner iterations needed before accepting the flux.
+  I set the kwarg in the inverse problem preparation. The tolerance should probably be one of the choices in the GUI.
+  If the speed of the inverse is resolved on your side, I think you can merge it.
+
 
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
