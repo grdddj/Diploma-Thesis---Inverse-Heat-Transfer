@@ -109,7 +109,7 @@ class InverseTrial:
         self.Problem = InverseProblem(self.Sim,
                                       q_init=20,
                                       window_span=parameters["window_span"],
-                                      tolerance=1e-6)  # TODO: make the tolerance a choice in the GUI
+                                      tolerance=parameters["tolerance"])
 
         self.MyCallBack = InverseCallback(progress_callback=progress_callback,
                                           Call_at=parameters["callback_period"],
