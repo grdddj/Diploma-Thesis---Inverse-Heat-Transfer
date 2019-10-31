@@ -178,7 +178,8 @@ class InverseTrial:
 
 
 def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
-             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None):
+             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None,
+             save_results=False):
     """
 
     """
@@ -213,7 +214,8 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
     x = time.time()
     # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
     app.make_inverse_step()
-    app.save_results_to_csv_file()
+    if save_results:
+        app.save_results_to_csv_file()
 
     # fig1 = plt.figure()
     # plt.plot(app.Problem.Sim.Exp_data.t_data, app.Problem.Sim.Exp_data.q_data)
