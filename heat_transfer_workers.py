@@ -26,10 +26,10 @@ class WorkerSignals(QtCore.QObject):
 
     '''
     # TODO: decide what to do with this (use it or delete it)
-    finished = QtCore.Signal()
-    error = QtCore.Signal(tuple)
-    result = QtCore.Signal(object)
-    progress = QtCore.Signal(int)
+    finished = QtCore.pyqtSignal()
+    error = QtCore.pyqtSignal(tuple)
+    result = QtCore.pyqtSignal(object)
+    progress = QtCore.pyqtSignal(int)
 
 
 class Worker(QtCore.QRunnable):
@@ -59,7 +59,7 @@ class Worker(QtCore.QRunnable):
         # Add the callback to our kwargs
         self.kwargs['progress_callback'] = self.signals.progress
 
-    @QtCore.Slot()
+    @QtCore.pyqtSlot()
     def run(self):
         '''
         Initialise the runner function with passed args, kwargs.
