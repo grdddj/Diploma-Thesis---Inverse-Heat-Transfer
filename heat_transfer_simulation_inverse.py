@@ -200,9 +200,10 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
             "place_of_interest": 0.0045,
             "number_of_elements": 100,
             "callback_period": 500,
-            "window_span": 2,
             "robin_alpha": 13.5,
-            "theta": 0.5
+            "theta": 0.5,
+            "window_span": 2,
+            "tolerance": 1e-05
         }
 
     app.PrepareSimulation(progress_callback=progress_callback,
