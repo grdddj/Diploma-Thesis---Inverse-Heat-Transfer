@@ -206,38 +206,12 @@ def run_multiple_simulations(parameter, values):
 
     return results
 
-def aggregate_all_tests(no_of_repetitions=1, steps=100):
+def aggregate_all_tests(testing_scenarios, no_of_repetitions=1):
     """
 
     """
 
     results = defaultdict(list)
-
-    # Defining all the scenarios we want to test
-    testing_scenarios = [
-        {
-            "parameter": "number_of_elements",
-            "values": list(map(int, np.linspace(1, 1000, steps)))
-        },
-        {
-            "parameter": "dt",
-            "values": list(map(int, np.linspace(1, 1000, steps)))
-        },
-        {
-            "parameter": "theta",
-            "values": np.linspace(0.5, 1.0, steps)
-        },
-        {
-            "parameter": "window_span",
-            "values": np.arange(1, 3, 1)
-        },
-        {
-            "parameter": "tolerance",
-            # "values": np.linspace(0.5, 1.0, steps)
-            # "values": [1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4]
-            "values": [0.00001, 0.00005, 0.0001]
-        }
-    ]
 
     # Running the tests multiple times, to account for variable CPU speed
     for _ in range(no_of_repetitions):
@@ -267,6 +241,36 @@ def aggregate_all_tests(no_of_repetitions=1, steps=100):
     show_data_in_jpg(averages, file_name)
 
 if __name__ == '__main__':
-    no_of_repetitions = 3
+    no_of_repetitions = 4
     steps = 200
-    aggregate_all_tests(no_of_repetitions=no_of_repetitions, steps=steps)
+
+    # Defining all the scenarios we want to test
+    testing_scenarios = [
+        # {
+        #     "parameter": "number_of_elements",
+        #     # "values": list(map(int, np.linspace(1, 1000, steps)))
+        #     "values": range(1, 100, 1)
+        # },
+        # {
+        #     "parameter": "dt",
+        #     # "values": list(map(int, np.linspace(1, 1000, steps)))
+        #     "values": range(1, 100, 1)
+        # },
+        # {
+        #     "parameter": "theta",
+        #     "values": np.linspace(0.5, 1.0, steps)
+        # },
+        # {
+        #     "parameter": "window_span",
+        #     "values": np.arange(1, 10, 1)
+        # },
+        {
+            "parameter": "tolerance",
+            # "values": [1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1, 1]
+            # "values": [0.00001, 0.00005, 0.0001]
+            # "values": np.arange(0.001, 0.1, 0.005)
+            "values": np.logspace(-5, -1, num=3, base=10)
+        }
+    ]
+
+    aggregate_all_tests(testing_scenarios=testing_scenarios, no_of_repetitions=no_of_repetitions)

@@ -204,28 +204,12 @@ def run_multiple_simulations(parameter, values):
 
     return results
 
-def aggregate_all_tests(no_of_repetitions=1, steps=100):
+def aggregate_all_tests(testing_scenarios, no_of_repetitions=1):
     """
 
     """
 
     results = defaultdict(list)
-
-    # Defining all the scenarios we want to test
-    testing_scenarios = [
-        {
-            "parameter": "number_of_elements",
-            "values": list(map(int, np.linspace(1, 1000, steps)))
-        },
-        {
-            "parameter": "dt",
-            "values": list(map(int, np.linspace(1, 1000, steps)))
-        },
-        {
-            "parameter": "theta",
-            "values": np.linspace(0.5, 1.0, steps)
-        }
-    ]
 
     # Running the tests multiple times, to account for variable CPU speed
     for _ in range(no_of_repetitions):
@@ -255,6 +239,26 @@ def aggregate_all_tests(no_of_repetitions=1, steps=100):
     show_data_in_jpg(averages, file_name)
 
 if __name__ == '__main__':
-    no_of_repetitions = 3
+    no_of_repetitions = 5
     steps = 200
-    aggregate_all_tests(no_of_repetitions=no_of_repetitions, steps=steps)
+
+
+    # Defining all the scenarios we want to test
+    testing_scenarios = [
+        # {
+        #     "parameter": "number_of_elements",
+        #     # "values": list(map(int, np.linspace(10, 1000, steps)))
+            # "values": range(1, 100, 1)
+        # },
+        {
+            "parameter": "dt",
+            # "values": list(map(int, np.linspace(1, 1000, steps)))
+            "values": range(20, 120, 50)
+        },
+        # {
+        #     "parameter": "theta",
+        #     "values": np.linspace(0.5, 1.0, steps)
+        # }
+    ]
+
+    aggregate_all_tests(testing_scenarios=testing_scenarios, no_of_repetitions=no_of_repetitions)
