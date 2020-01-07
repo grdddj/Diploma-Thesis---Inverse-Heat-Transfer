@@ -26,7 +26,7 @@ class NewCallback:
 
     """
     def __init__(self, Call_at=500.0, ExperimentData=None, heat_flux_plot=None,
-                 temperature_plot=None,queue=None, progress_callback=None):
+                 temperature_plot=None, queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
         self.last_call = 0  # placeholder fot time in which the callback was last called
 
@@ -101,7 +101,7 @@ class NewCallback:
         if self.simulation_state != "running" and self.progress_callback is not None:
             self.progress_callback.emit(0)
 
-        # Returning the current ismulation state to be handled by make_sim_step()
+        # Returning the current simulation state to be handled by make_sim_step()
         return self.simulation_state
 
 class Trial():
@@ -220,7 +220,6 @@ def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
         app.make_sim_step()
         z = time.time()
         print("make_sim_step: {}".format(round(z - y, 3)))
-        # progress_callback.emit("ggf")
         if save_results:
             app.save_results_to_csv_file()
 

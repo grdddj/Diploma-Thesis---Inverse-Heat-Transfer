@@ -327,7 +327,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Getting number parameters from the user in the form of a dictionary.
             Dictionary is better than list, because we are defining everything
             including the variable name in a separate file, and GUI does not
-            have to care about anything - just passing whatever is founds
+            have to care about anything - just passing whatever is found
             to the simulation.
         Depends on all the inputted elements to have a certain structure,
             to be processed the right way.

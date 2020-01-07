@@ -1,28 +1,30 @@
 """
 This module is serving as a helper for a very quick linear interpolation,
     that is always happening at the one point, which is specified
-    at the initialisation, and is not changed
+    at the initialisation, and is not changed.
 
 The previous version of this module, containing two implementations, was
     transferred to "Older stuff" folder, and the not used class
     was removed from here.
 
-Long time I was thinking about unifying those two subclasses (for float and for list) into
-    only one (which would mean there could be only one class in total) - and I actually
-    did it ("interpolations_no_subclasses"), because it is reducing the code complexity
-    in return of just one more if statement.
-In the end however, I decided to leave it like this, because it is a masterpiece of yours,
-    and also it will be another speed-improving technique that I could describe
-    in the thesis itself.
+I really liked the solution of having two subclasses from the creative
+    point of view, but it was adding unnecessary complexity to the code
+    (also when creating the self.T_x0_interpolator in NumericalForward).
+Therefore I decided to unify it in only one class - with the point that
+    one more if-statement cannot ruin the performance.
 """
 
 class Predefined_interp:
     """
-    Base class for interpolation, that is responsible for setting up the
-        important internal variables.
+    Class responsible for handling the quick interpolation in predefined
+        point(s).
     """
 
     def __init__(self, x0, x):
+        """
+        Initialising all the internal variables
+        """
+
         self.indexes = self.find_interp_indexes(x0,x)
         self.n = len(self.indexes)
 
@@ -33,13 +35,22 @@ class Predefined_interp:
         else:
             self.x_diff_ratios = [(x0[i]-x[self.indexes[i]])/(x[self.indexes[i]+1] - x[self.indexes[i]]) for i in range(self.n)]
 
+    def __call__(self, y):
+        """
+        Returning the value in y list that corresponds to the position
+            of the initial x0 value
+        """
+
+        if self.n == 1:
+            return y[self.indexes[0]]+((y[self.indexes[0]+1] - y[self.indexes[0]])*self.x_diff_ratios)
+        else:
+            return [y[self.indexes[i]]+((y[self.indexes[i]+1] - y[self.indexes[i]])*self.x_diff_ratios[i]) for i in range(self.n)]
+
     @staticmethod
     def find_interp_indexes(x0, x):
         """
         Finding out the right indexes of all x0 values in the x list,
             so that we can then interpolate from list almost instantly
-
-        NOTE: the method changed to static, as it is not utilising self at all
         """
 
         indexes = []
@@ -64,25 +75,3 @@ class Predefined_interp:
             indexes.append(idx-1)
 
         return indexes
-
-class Predefined_interp_for_float(Predefined_interp):
-    """
-    Class set to interpolate only one float value
-
-    Is the basic class for when we perform the temperature measurements
-        only at one place
-    """
-
-    def __call__(self,y):
-        return y[self.indexes[0]]+((y[self.indexes[0]+1] - y[self.indexes[0]])*self.x_diff_ratios)
-
-class Predefined_interp_for_list(Predefined_interp):
-    """
-    Class set to interpolate the whole list of multiple float values
-
-    Comes into play when we want to determine more values at the same time
-        (the temperature should be determined at more places)
-    """
-
-    def __call__(self,y):
-        return [y[self.indexes[i]]+((y[self.indexes[i]+1] - y[self.indexes[i]])*self.x_diff_ratios[i]) for i in range(self.n)]
