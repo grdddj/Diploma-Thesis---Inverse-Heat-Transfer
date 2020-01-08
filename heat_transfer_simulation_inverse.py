@@ -3,8 +3,10 @@ This module is serving for running the Inverse simulation.
 It can be run separately or from the GUI, in which case it will be updating the plot.
 """
 
-
-from NumericalInverse import *
+from NumericalInverse import InverseProblem
+from NumericalForward import Simulation
+from experiment_data_handler import Material
+import numpy as np
 import csv
 import time
 import os
@@ -13,6 +15,7 @@ class InverseCallback:
     """
 
     """
+
     def __init__(self, Call_at=500.0, ExperimentData=None, heat_flux_plot=None,
                  temperature_plot=None,queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
@@ -38,6 +41,7 @@ class InverseCallback:
         """
 
         """
+
         # Update the time calculation is in progress
         if Sim.current_t_inverse > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
@@ -87,16 +91,17 @@ class InverseCallback:
         # Returning the current ismulation state to be handled by make_sim_step()
         return self.simulation_state
 
-class InverseTrial:
+class InverseSimulationController:
     """
 
     """
 
-    def PrepareSimulation(self, progress_callback, temperature_plot,
+    def prepare_inverse_simulation(self, progress_callback, temperature_plot,
                           heat_flux_plot, queue, parameters):
         """
 
         """
+
         my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])
         self.Sim = Simulation(length=parameters["object_length"],
                               material=my_material,
@@ -116,10 +121,11 @@ class InverseTrial:
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
                                           queue=queue)
-    def make_inverse_step(self):
+    def complete_inverse_simulation(self):
         """
 
         """
+
         while self.Problem.Sim.current_step_idx < self.Problem.Sim.max_step_idx:
             # Processing the callback and getting the simulation state at the same time
             # Then acting accordingly to the current state
@@ -159,6 +165,7 @@ class InverseTrial:
         Outputs the (semi)results of a simulation into a CSV file and names it
             accordingly.
         """
+
         # TODO: discuss the possible filename structure
         file_name = "Inverse-{}-{}C-{}s.csv".format(material, int(self.Sim.T_x0[0]),
                                                     int(self.Sim.t[-1]))
@@ -177,58 +184,40 @@ class InverseTrial:
                 csv_writer.writerow([time_value, temperature])
 
 
-def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
-             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None,
-             save_results=False):
+def run_inverse_simulation(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
+             amount_of_trials=1, queue=None, parameters=None, save_results=False):
     """
 
     """
-    app = InverseTrial()
 
-    # The description of tested scenario, what was changed etc.
-    if SCENARIO_DESCRIPTION is None:
-        SCENARIO_DESCRIPTION = "INVERSE"
+    app = InverseSimulationController()
 
-    # If there are no inputted parameters for some reason, replace it with default ones
-    if parameters is None:
-        parameters = {
-            "rho": 7850,
-            "cp": 520,
-            "lmbd": 50,
-            "dt": 50,
-            "object_length": 0.01,
-            "place_of_interest": 0.0045,
-            "number_of_elements": 100,
-            "callback_period": 500,
-            "robin_alpha": 13.5,
-            "theta": 0.5,
-            "window_span": 2,
-            "tolerance": 1e-05
-        }
-
-    app.PrepareSimulation(progress_callback=progress_callback,
+    app.prepare_inverse_simulation(progress_callback=progress_callback,
                           temperature_plot=temperature_plot,
                           heat_flux_plot=heat_flux_plot,
                           queue=queue,
                           parameters=parameters)
 
-    x = time.time()
-    # loop (higher window_span makes it slower, there is always an ideal value regarding speed vs accuracy)
-    app.make_inverse_step()
+    app.complete_inverse_simulation()
     if save_results:
         app.save_results_to_csv_file()
-
-    # fig1 = plt.figure()
-    # plt.plot(app.Problem.Sim.Exp_data.t_data, app.Problem.Sim.Exp_data.q_data)
-    # plt.plot(app.Problem.Sim.t, app.Problem.Sim.HeatFlux)
-    #
-    # fig2 = plt.figure()
-    # plt.plot(app.Problem.Sim.Exp_data.t_data, app.Problem.Sim.Exp_data.T_data)
-    # plt.plot(app.Problem.Sim.t, app.Problem.Sim.T_x0)
-    #
-    # plt.show()
 
     return {"error_value": app.ErrorNorm}
 
 if __name__ == '__main__':
-    run_test()
+    parameters = {
+        "rho": 7850,
+        "cp": 520,
+        "lmbd": 50,
+        "dt": 50,
+        "object_length": 0.01,
+        "place_of_interest": 0.0045,
+        "number_of_elements": 100,
+        "callback_period": 500,
+        "robin_alpha": 13.5,
+        "theta": 0.5,
+        "window_span": 2,
+        "tolerance": 1e-05
+    }
+
+    run_inverse_simulation(parameters=parameters)

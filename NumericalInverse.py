@@ -1,10 +1,12 @@
-from NumericalForward import *
-# This is not functional yet!!! I will have to test it and debug it first. Do NOT implement this into the GUI!!
-# I will do make incremental commits rather then complete ones since a get bad
-#  conflicts in my local repository (I had to completely rebase) when we both make changes to Tests.py
-# This commit should not break anything, at least it did not on my side.
+class InverseProblem:  # later abbreviated as Prob
+    """
+    Class holding variables and methods to allow for the simulation of the
+        inverse problem
 
-class InverseProblem():  # later abbreviated as Prob
+    It is dependant on the Simulation class, as it is initialised with
+        the instance of it (we could maybe consider making this a subclass of it)
+    """
+
     def __init__(self, Sim, q_init=20.0, window_span=3, tolerance=1e-8):
         self.Sim = Sim  # placeholder for Sim state that the new fluxes are tested on
         self.window_span = window_span
@@ -15,13 +17,26 @@ class InverseProblem():  # later abbreviated as Prob
         # fluxes to be resolved
         self.current_q_idx = 0  # initial index
         self.Sim.HeatFlux.fill(q_init)  # change initial values
-        self.ElapsedTime = 0
 
     def evaluate_window_error_norm(self):
+        """
+        Determining the current error norm we achieved with our estimation of
+            heat flux
+        Comparing the measured temperatures with the temperatures resulting
+            from simulation with the estimated heat flux
+        """
+
         end_idx = self.current_q_idx+self.window_span+1
         return sum((self.Sim.T_x0[self.current_q_idx:end_idx] - self.Sim.T_data[self.current_q_idx:end_idx])**2)
-
+    
     def evaluate_one_inverse_step(self, init_q_adjustment=10):
+        """
+        Running one whole step of the inverse simulation, until the point
+            we are satisfied with the results
+        We are done with the step when the difference of two successive
+            error values is less than the tolerance that was set in __init__
+        """
+
         self.Sim.make_checkpoint()  # checkpoint previous state so we can revert to it
         q_adj = init_q_adjustment  # initial adjustments to heat flux being currently solved
         self.Sim.HeatFlux[self.current_q_idx] = self.Sim.HeatFlux[self.current_q_idx-1]  # explicit portion

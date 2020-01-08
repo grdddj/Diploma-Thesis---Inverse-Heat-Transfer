@@ -1,32 +1,9 @@
-
-# QUESTION: What is the reason of this line - to run the file without writing "python3" in front of it?
-# ANSWER: Yes, although I am not sure if it works with all operating systems, (Linux terminal: ./script.py starts the script without python3 infront of it)
-# NOTE: It has to be the fist line in the file otherwise it will not work!
-
 import numpy as np  # this has some nice mathematics related functions
 from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
 from scipy.sparse.linalg import spsolve    # this guy can solve equation faster by taking advantage of the sparsity (it ignores zeros in the matrices)
 from experiment_data_handler import Experimental_data, Material
 from interpolations import Predefined_interp_for_float, Predefined_interp_for_list
-import matplotlib.pyplot as plt  # some ploting backend - but you can change to whatever you need
 
-# material properties - we can make some basic database of those, but I  would leave an option to define custom ones
-# Yeah, the DB will be provided, with the ability of defining custom materials.
-# I had an idea of implementing the material characteristics as a funtion,
-#   but I am afraid it would make the calculations slower, if we had to
-#   calculate it after each temperature change. What do you think - is it
-#   even possible to find temperature-depending functions for rho, cp and lmbd
-#   at least for some common materials?
-# We could find some temperature depending material properties, but the way we would
-#   have to handle the calculatinos would be super-slow when using python directly as we do here.
-#   It would basically require to recalculate the Sim.M and Sim.K every step and the induced non-linearity of it
-#   would require insertion of Newton type solver rigth in between the time-stepping and the linear spsolve.
-#   Then imagine the inverse solver around all of that stuff... ouch!
-#   We might try that with the FeniCS library though, which would handle bunch of these stuff automatically,
-#   but the slowness might be still quite painful (usually these kind of complexity requires more CPU cores, and heavy paralelisation).
-#   I would start with the constant propperty and then see how fast it can be implemented.
-
-# here we do the finite element method magic and define some placeholders to handle stuff
 class Simulation:  # In later objects abreviated as Sim
     """
     theta = 0.0 - fully explicit 1st order, numerically unstable.
@@ -99,8 +76,13 @@ class Simulation:  # In later objects abreviated as Sim
         self.b = np.empty(N+1)  # allocate memory for vector b
 
     # Function that calculates new timestep (integration step)
-
+    @profile
     def evaluate_one_step(self):
+        """
+        Simulating one step of the simulation
+        Is using already initialised instance variables
+        """
+
         # evaluate new boundary vector (BC means boundary condition)
         self.b = self.b_base.dot(self.T)  # Assemble vector b (dot() is matrix multiplication)
         self.b[0] += self.dt*(1-self.theta)*self.HeatFlux[self.current_step_idx]  # apply explicit portion of HeatFlux (Neumann BC 1st node)
@@ -117,15 +99,29 @@ class Simulation:  # In later objects abreviated as Sim
         self.current_t_forward += self.dt # Updating time info for the callback
 
     def evaluate_N_steps(self, N=1):
+        """
+        Running the evaluate_one_step() function multiple times
+        """
+
         step = 0
         while self.current_step_idx < self.max_step_idx and step < N:
             self.evaluate_one_step()
             step += 1
 
     def make_checkpoint(self):
+        """
+        Saving the current temperature distribution, to be able to
+            run experiments with heat fluxes and not losing the
+            initial state
+        """
+
         self.checkpoint_step_idx = self.current_step_idx
         self.T_checkpoint[:] = self.T[:]
 
     def revert_to_checkpoint(self):
+        """
+        Restoring the temperature distribution that was previously saved
+        """
+
         self.current_step_idx = self.checkpoint_step_idx
         self.T[:] = self.T_checkpoint[:]

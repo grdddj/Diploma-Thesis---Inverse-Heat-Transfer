@@ -1,0 +1,48 @@
+Including updated profiling of the main inverse function,
+  as it changed a little bit from previous profilings
+
+
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    31                                               @profile
+    32                                               def evaluate_one_inverse_step(self, init_q_adjustment=10):
+    33                                                   """
+    34                                                   Running one whole step of the inverse simulation, until the point
+    35                                                       we are satisfied with the results
+    36                                                   We are done with the step when the difference of two successive
+    37                                                       error values is less than the tolerance that was set in __init__
+    38                                                   """
+    39
+    40        97       7397.0     76.3      0.1          self.Sim.make_checkpoint()  # checkpoint previous state so we can revert to it
+    41        97       1541.0     15.9      0.0          q_adj = init_q_adjustment  # initial adjustments to heat flux being currently solved
+    42        97       2274.0     23.4      0.0          self.Sim.HeatFlux[self.current_q_idx] = self.Sim.HeatFlux[self.current_q_idx-1]  # explicit portion
+    43        97       1953.0     20.1      0.0          self.Sim.HeatFlux[self.current_q_idx+1] = self.Sim.HeatFlux[self.current_q_idx-1]  # implicit portion
+    44        97      23794.0    245.3      0.2          prev_Error = self.evaluate_window_error_norm()
+    45        97       1516.0     15.6      0.0          iter = 0
+    46        97        975.0     10.1      0.0          while True:
+    47                                                       # simulate few steps
+    48      2297      34076.0     14.8      0.2              iter += 1
+    49      2297   12970788.0   5646.8     90.0              self.Sim.evaluate_N_steps(N=self.window_span)
+    50      2297     652659.0    284.1      4.5              new_Error = self.evaluate_window_error_norm()
+    51
+    52      2297      86733.0     37.8      0.6              if abs(prev_Error - new_Error) < self.tolerance:
+    53        97       6376.0     65.7      0.0                  self.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
+    54        97     253391.0   2612.3      1.8                  self.Sim.evaluate_one_step()  # make one step only
+    55                                                           # print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (self.Sim.HeatFlux[self.current_q_idx], self.Sim.t[self.current_q_idx], new_Error, iter))
+    56        97       2070.0     21.3      0.0                  break  # this Flux seems to be ok so stop adjusting it
+    57      2200      30911.0     14.1      0.2              elif new_Error < prev_Error:
+    58
+    59      1811      24031.0     13.3      0.2                  prev_Error = new_Error
+    60      1811     136645.0     75.5      0.9                  self.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
+    61                                                           # and keep adjusting the heat flux the by the same value because the error is getting smaller
+    62       389       4542.0     11.7      0.0              elif new_Error > prev_Error:
+    63
+    64       389       4509.0     11.6      0.0                  prev_Error = new_Error
+    65       389      26461.0     68.0      0.2                  self.Sim.revert_to_checkpoint()  # revert simulation to last checkpoint
+    66       389       6832.0     17.6      0.0                  q_adj *= -0.7  # and make adjustments to the heat flux smaller going in the opposite direction because the error got higher last time
+    67      2200      70668.0     32.1      0.5              self.Sim.HeatFlux[self.current_q_idx] += q_adj  # adjust heatflux a little in the explicit portion
+    68      2200      57796.0     26.3      0.4              self.Sim.HeatFlux[self.current_q_idx+1] += q_adj  # adjust heatflux a little in the implicit portion
+    69        97       1818.0     18.7      0.0          self.current_q_idx += 1  # since the current flux is adjusted enough tell the Prob to adjust next one in next SolveInverseStep call
+    70        97       1792.0     18.5      0.0          self.Sim.current_t_inverse += self.Sim.dt # Updating time info for the callback

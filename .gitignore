@@ -5,6 +5,7 @@ __pycache__
 *csv
 *.png
 *.exe
+*.lprof
 output
 Performance
 Parameters

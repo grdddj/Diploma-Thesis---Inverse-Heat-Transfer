@@ -15,16 +15,19 @@ TODOS:
     - create documentation for the functions and classes
 """
 
-from NumericalForward import *
+from NumericalForward import Simulation
+from experiment_data_handler import Material
+import numpy as np
 import csv
 import time
 import os
 import threading
 
-class NewCallback:
+class Callback:
+    """
+    Class defining the actions that should happen when the simulation
     """
 
-    """
     def __init__(self, Call_at=500.0, ExperimentData=None, heat_flux_plot=None,
                  temperature_plot=None, queue=None, progress_callback=None):
         self.Call_at = Call_at  # specify how often to be called (default is every 50 seccond)
@@ -54,6 +57,7 @@ class NewCallback:
         """
 
         """
+
         # Update the time calculation is in progress
         if Sim.current_t_forward > self.last_call + self.Call_at or force_update == True:  # if it is time to comunicate with GUI then show something
             if self.temperature_plot is not None:
@@ -101,15 +105,15 @@ class NewCallback:
         if self.simulation_state != "running" and self.progress_callback is not None:
             self.progress_callback.emit(0)
 
-        # Returning the current simulation state to be handled by make_sim_step()
+        # Returning the current simulation state to be handled by complete_simulation()
         return self.simulation_state
 
-class Trial():
+class SimulationController:
     """
 
     """
 
-    def PrepareSimulation(self, progress_callback, temperature_plot,
+    def prepare_simulation(self, progress_callback, temperature_plot,
                           heat_flux_plot, queue, parameters):
         """
 
@@ -124,17 +128,18 @@ class Trial():
                               dt=parameters["dt"],
                               x0=parameters["place_of_interest"])
 
-        self.MyCallBack = NewCallback(progress_callback=progress_callback,
+        self.MyCallBack = Callback(progress_callback=progress_callback,
                                       Call_at=parameters["callback_period"],
                                       temperature_plot=temperature_plot,
                                       heat_flux_plot=heat_flux_plot,
                                       queue=queue)
         return True
 
-    def make_sim_step(self):
+    def complete_simulation(self):
         """
 
         """
+
         while self.Sim.current_step_idx < self.Sim.max_step_idx:
             # Processing the callback and getting the simulation state at the same time
             # Then acting accordingly to the current state
@@ -159,6 +164,7 @@ class Trial():
         Outputs the (semi)results of a simulation into a CSV file and names it
             accordingly.
         """
+
         # TODO: discuss the possible filename structure
         file_name = "Classic-{}-{}C-{}s.csv".format(material, int(self.Sim.T_x0[0]),
                                             int(self.Sim.t[-1]))
@@ -176,82 +182,39 @@ class Trial():
             for time_value, temperature in zip(self.Sim.t, self.Sim.T_x0):
                 csv_writer.writerow([time_value, temperature])
 
-def run_test(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
-             amount_of_trials=1, queue=None, parameters=None, SCENARIO_DESCRIPTION=None,
-             save_results=False):
+def run_simulation(temperature_plot=None, heat_flux_plot=None, progress_callback=None,
+             amount_of_trials=1, queue=None, parameters=None, save_results=False):
     """
 
     """
-    app = Trial()
 
-    # The description of tested scenario, what was changed etc.
-    if SCENARIO_DESCRIPTION is None:
-        SCENARIO_DESCRIPTION = "SpeedTest"
+    simulation = SimulationController()
 
-    # If there are no inputted parameters for some reason, replace it with default ones
-    if parameters is None:
-        parameters = {
-            "rho": 7850,
-            "cp": 520,
-            "lmbd": 50,
-            "dt": 1,
-            "object_length": 0.01,
-            "place_of_interest": 0.0045,
-            "number_of_elements": 100,
-            "callback_period": 500,
-            "robin_alpha": 13.5,
-            "theta": 0.5
-        }
+    simulation.prepare_simulation(progress_callback=progress_callback,
+                          temperature_plot=temperature_plot,
+                          heat_flux_plot=heat_flux_plot,
+                          queue=queue,
+                          parameters=parameters)
 
-    now = time.time()
-
-    # Running the simulation for specific amount of trials
-    for i in range(amount_of_trials):
-        print("Current thread: {}".format(threading.currentThread().getName()))
-
-        x = time.time()
-        app.PrepareSimulation(progress_callback=progress_callback,
-                              temperature_plot=temperature_plot,
-                              heat_flux_plot=heat_flux_plot,
-                              queue=queue,
-                              parameters=parameters)
-        y = time.time()
-        print("PrepareSimulation: {}".format(round(y - x, 3)))
-        app.make_sim_step()
-        z = time.time()
-        print("make_sim_step: {}".format(round(z - y, 3)))
-        if save_results:
-            app.save_results_to_csv_file()
-
-    print(80*"*")
-
-    average_loop_time = (time.time() - now) / amount_of_trials
-    average_loop_time = round(average_loop_time, 3)
-    print("average_loop_time: {} seconds".format(average_loop_time))
-
-    # Saving the results to have access to them later
-    # (useful when comparing and trying to remember what was tried and what not)
-
-    # Creating a directory "Performace" if it does not exist already
-    WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-    directory_for_results = os.path.join(WORKING_DIRECTORY, 'Performance')
-    if not os.path.isdir(directory_for_results):
-        os.mkdir(directory_for_results)
-
-    # Getting the file appropriate name
-    file_name = "{}/{}s-{}e-{}.txt".format(directory_for_results, average_loop_time, app.ErrorNorm, SCENARIO_DESCRIPTION)
-
-    # Saving useful info to the file
-    with open(file_name, "w") as file:
-        file.write("DESCRIPTION: {}\n".format(SCENARIO_DESCRIPTION))
-        file.write("average_loop_time: {}\n".format(average_loop_time))
-        file.write("amount_of_trials: {}\n".format(amount_of_trials))
-        file.write("number_of_elements: {}\n".format(parameters["number_of_elements"]))
-        file.write("dt: {}\n".format(parameters["dt"]))
-        file.write("ErrorNorm: {}\n".format(app.ErrorNorm))
+    simulation.complete_simulation()
+    if save_results:
+        simulation.save_results_to_csv_file()
 
     # Returning the dictionary with arbitrary information for the GUI to be notified
-    return {"error_value": app.ErrorNorm}
+    return {"error_value": simulation.ErrorNorm}
 
 if __name__ == '__main__':
-    run_test(amount_of_trials=2, SCENARIO_DESCRIPTION="SpeedTest")
+    parameters = {
+        "rho": 7850,
+        "cp": 520,
+        "lmbd": 50,
+        "dt": 1,
+        "object_length": 0.01,
+        "place_of_interest": 0.0045,
+        "number_of_elements": 100,
+        "callback_period": 500,
+        "robin_alpha": 13.5,
+        "theta": 0.5
+    }
+
+    run_simulation(amount_of_trials=2, parameters=parameters)

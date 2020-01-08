@@ -393,20 +393,24 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
     def pause_simulation(self):
         """
         What to do when simulation is paused
+        Having it enabled only when the simulation is running
         """
-        self.set_simulation_state("paused")
-        print("PAUSING THE SIMULATION!!!!")
-        # Sending signal to the calculating thread to have a rest
-        self.queue.put("pause")
+        if self.simulation_state == "running":
+            self.set_simulation_state("paused")
+            print("PAUSING THE SIMULATION!!!!")
+            # Sending signal to the calculating thread to have a rest
+            self.queue.put("pause")
 
     def stop_simulation(self):
         """
         What to do when a simulation is stopped
+        Having it enabled only when the simulation is running or paused
         """
-        self.set_simulation_state("stopped")
-        print("STOPPING THE SIMULATION!!!!")
-        # Telling the calculating thread to give up
-        self.queue.put("stop")
+        if self.simulation_state in ["running", "paused"]:
+            self.set_simulation_state("stopped")
+            print("STOPPING THE SIMULATION!!!!")
+            # Telling the calculating thread to give up
+            self.queue.put("stop")
 
     def run_simulation(self):
         """
@@ -425,7 +429,6 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.set_simulation_state("running")
         self.error_label_2.setText("ERROR:")
         print("RUNNING THE SIMULATION")
-        self.queue.put("WE HAVE JUST BEGAN!")
 
         # Getting current material from GUI and it's peoperties from the service
         self.chosen_material = self.material_combo_box.currentText()
@@ -461,14 +464,12 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # Running the specific simulation
         if self.get_current_algorithm() == "classic":
             print("classic")
-            worker = Worker(heat_transfer_simulation.run_test,
-                            **common_arguments_to_workers,
-                            SCENARIO_DESCRIPTION="GUI - Classic")
+            worker = Worker(heat_transfer_simulation.run_simulation,
+                            **common_arguments_to_workers)
         elif self.get_current_algorithm() == "inverse":
             print("inverse")
-            worker = Worker(heat_transfer_simulation_inverse.run_test,
-                            **common_arguments_to_workers,
-                            SCENARIO_DESCRIPTION="GUI - Inverse")
+            worker = Worker(heat_transfer_simulation_inverse.run_inverse_simulation,
+                            **common_arguments_to_workers)
 
         # Opening some additional communication channels with the workers
         worker.signals.result.connect(self.process_output)

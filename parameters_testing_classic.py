@@ -147,23 +147,23 @@ def run_simulation(temperature_plot=None, heat_flux_plot=None,
         error of the simulation
     """
 
-    app = heat_transfer_simulation.Trial()
+    simulation = heat_transfer_simulation.SimulationController()
 
     start_time = time.time()
 
-    app.PrepareSimulation(progress_callback=progress_callback,
+    simulation.prepare_simulation(progress_callback=progress_callback,
                           temperature_plot=temperature_plot,
                           heat_flux_plot=heat_flux_plot,
                           queue=queue,
                           parameters=parameters)
-    app.make_sim_step()
+    simulation.make_sim_step()
 
     end_time = time.time()
     time_diff = round(end_time - start_time, 3)
 
     return {
         "time": time_diff,
-        "error": app.ErrorNorm
+        "error": simulation.ErrorNorm
     }
 
 def run_multiple_simulations(parameter, values):
