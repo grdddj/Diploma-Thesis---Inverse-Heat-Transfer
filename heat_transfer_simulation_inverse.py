@@ -121,6 +121,7 @@ class InverseSimulationController:
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
                                           queue=queue)
+
     def complete_inverse_simulation(self):
         """
 

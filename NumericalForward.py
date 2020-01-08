@@ -76,7 +76,6 @@ class Simulation:  # In later objects abreviated as Sim
         self.b = np.empty(N+1)  # allocate memory for vector b
 
     # Function that calculates new timestep (integration step)
-    @profile
     def evaluate_one_step(self):
         """
         Simulating one step of the simulation

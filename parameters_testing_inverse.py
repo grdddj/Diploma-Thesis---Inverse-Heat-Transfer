@@ -147,23 +147,23 @@ def run_simulation(temperature_plot=None, heat_flux_plot=None,
         error of the simulation
     """
 
-    app = heat_transfer_simulation_inverse.InverseTrial()
+    simulation = heat_transfer_simulation_inverse.InverseSimulationController()
 
     start_time = time.time()
 
-    app.PrepareSimulation(progress_callback=progress_callback,
+    simulation.prepare_inverse_simulation(progress_callback=progress_callback,
                           temperature_plot=temperature_plot,
                           heat_flux_plot=heat_flux_plot,
                           queue=queue,
                           parameters=parameters)
-    app.make_inverse_step()
+    simulation.complete_inverse_simulation()
 
     end_time = time.time()
     time_diff = round(end_time - start_time, 3)
 
     return {
         "time": time_diff,
-        "error": app.ErrorNorm
+        "error": simulation.ErrorNorm
     }
 
 def run_multiple_simulations(parameter, values):
