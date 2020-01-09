@@ -496,7 +496,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
             # Update the label to show latest time
             elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
-            self.time_label_2.setText("TIME: {} s".format(round(elapsed_time, 2)))
+            self.update_time_label(elapsed_time)
         elif simulation_state == 0:
             # Handle transition from running to paused, otherwise do nothing
             if self.time_is_running == True:
@@ -504,7 +504,20 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
                 self.simulation_paused_timestamp = now
 
                 elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
-                self.time_label_2.setText("TIME: {} s".format(round(elapsed_time, 2)))
+                self.update_time_label(elapsed_time)
+
+    def update_time_label(self, time_value):
+        """
+        Updates the time value in the time label
+        Showing the value in seconds with the precision of 2 decimal places
+        """
+        self.time_label_2.setText("TIME: {} s".format(round(time_value, 2)))
+
+    def update_error_label(self, error_value):
+        """
+        Updates the error value in the error label
+        """
+        self.error_label_2.setText("ERROR: {}".format(error_value))
 
     def process_output(self, returned_object):
         """
@@ -512,7 +525,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         print(returned_object)
         # TODO: create a function to change this error, and to colour it accordingly
-        self.error_label_2.setText("ERROR: {}".format(returned_object["error_value"]))
+        self.update_error_label(returned_object["error_value"])
 
     def lock_inputs_for_editing(self, lock=True):
         """

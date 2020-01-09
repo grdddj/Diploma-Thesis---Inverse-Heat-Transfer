@@ -191,19 +191,19 @@ def run_inverse_simulation(temperature_plot=None, heat_flux_plot=None, progress_
 
     """
 
-    app = InverseSimulationController()
+    simulation = InverseSimulationController()
 
-    app.prepare_inverse_simulation(progress_callback=progress_callback,
+    simulation.prepare_inverse_simulation(progress_callback=progress_callback,
                           temperature_plot=temperature_plot,
                           heat_flux_plot=heat_flux_plot,
                           queue=queue,
                           parameters=parameters)
 
-    app.complete_inverse_simulation()
+    simulation.complete_inverse_simulation()
     if save_results:
-        app.save_results_to_csv_file()
+        simulation.save_results_to_csv_file()
 
-    return {"error_value": app.ErrorNorm}
+    return {"error_value": simulation.ErrorNorm}
 
 if __name__ == '__main__':
     parameters = {
