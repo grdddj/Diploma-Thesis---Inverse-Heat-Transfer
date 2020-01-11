@@ -6,7 +6,7 @@ class Material:
         self.cp = cp  # Specific heat capacity
         self.lmbd = lmbd  # Heat conductivity
 
-class Experimental_data():
+class ExperimentalData:
     def __init__(self, csv_file_path="DATA.csv"):
         self.t_data = []  # experimental data of time points
         self.T_data = []  # experimental data of temperature

@@ -17,14 +17,15 @@ error-handling of each possible exception.
 """
 # Imports for fetching and analysing the content from web
 # bs4 is not a native module, need to install it
+import re
+import json
+from csv import writer
 import requests
 from bs4 import BeautifulSoup
-import re
-from csv import writer
-import json
 
 # CONTROLLERS
 custom_file_name = "metals_properties"
+
 
 def main():
     # Initial page, from which we get the list of all elements
@@ -138,20 +139,21 @@ def main():
     try:
         file_name = custom_file_name if custom_file_name != "" else "elements"
         with open(file_name + ".csv", "w") as csv_file:
-        	csv_writer = writer(csv_file)
-        	headers = ["NAME", "T_MELT [°C]", "RHO [kg/m3]", "C_P [J/(kg*K)]", "LAMBDA [W/(m*K)]"]
-        	csv_writer.writerow(headers)
+            csv_writer = writer(csv_file)
+            headers = ["NAME", "T_MELT [°C]", "RHO [kg/m3]", "C_P [J/(kg*K)]", "LAMBDA [W/(m*K)]"]
+            csv_writer.writerow(headers)
 
-        	for element in element_list:
-        		element_row = []
-        		element_row.append(element["element_name"])
-        		element_row.append(element["element_melting_temp"])
-        		element_row.append(element["element_density"])
-        		element_row.append(element["element_thermal_capacity"])
-        		element_row.append(element["element_thermal_conductivity"])
-        		csv_writer.writerow(element_row)
+            for element in element_list:
+                element_row = []
+                element_row.append(element["element_name"])
+                element_row.append(element["element_melting_temp"])
+                element_row.append(element["element_density"])
+                element_row.append(element["element_thermal_capacity"])
+                element_row.append(element["element_thermal_conductivity"])
+                csv_writer.writerow(element_row)
     except Exception as e:
         pass
+
 
 def take_first_numbers(string: str):
     """
@@ -165,6 +167,7 @@ def take_first_numbers(string: str):
         else:
             return number
     return number
+
 
 if __name__ == '__main__':
     main()

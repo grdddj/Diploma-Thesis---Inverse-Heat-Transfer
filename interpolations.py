@@ -7,23 +7,25 @@ The previous version of this module, containing two implementations, was
     transferred to "Older stuff" folder, and the not used class
     was removed from here.
 
-Long time I was thinking about unifying those two subclasses (for float and for list) into
-    only one (which would mean there could be only one class in total) - and I actually
-    did it ("interpolations_no_subclasses"), because it is reducing the code complexity
-    in return of just one more if statement.
-In the end however, I decided to leave it like this, because it is a masterpiece of yours,
-    and also it will be another speed-improving technique that I could describe
-    in the thesis itself.
+Long time I was thinking about unifying those two subclasses (for float and
+    for list) into only one (which would mean there could be only one class
+    in total) - and I actually did it ("interpolations_no_subclasses"),
+    because it is reducing the code complexity in return of just one more
+    if statement.
+In the end however, I decided to leave it like this, because it is a
+    masterpiece of yours, and also it will be another speed-improving
+    technique that I could describe in the thesis itself.
 """
 
-class Predefined_interp:
+
+class PredefinedInterp:
     """
     Base class for interpolation, that is responsible for setting up the
         important internal variables.
     """
 
     def __init__(self, x0, x):
-        self.indexes = self.find_interp_indexes(x0,x)
+        self.indexes = self.find_interp_indexes(x0, x)
         self.n = len(self.indexes)
 
         # Determining where exactly is the x0 point in relation to the
@@ -65,7 +67,8 @@ class Predefined_interp:
 
         return indexes
 
-class Predefined_interp_for_float(Predefined_interp):
+
+class PredefinedInterpForFloat(PredefinedInterp):
     """
     Class set to interpolate only one float value
 
@@ -73,10 +76,11 @@ class Predefined_interp_for_float(Predefined_interp):
         only at one place
     """
 
-    def __call__(self,y):
+    def __call__(self, y):
         return y[self.indexes[0]]+((y[self.indexes[0]+1] - y[self.indexes[0]])*self.x_diff_ratios)
 
-class Predefined_interp_for_list(Predefined_interp):
+
+class PredefinedInterpForList(PredefinedInterp):
     """
     Class set to interpolate the whole list of multiple float values
 
@@ -84,5 +88,5 @@ class Predefined_interp_for_list(Predefined_interp):
         (the temperature should be determined at more places)
     """
 
-    def __call__(self,y):
+    def __call__(self, y):
         return [y[self.indexes[i]]+((y[self.indexes[i]+1] - y[self.indexes[i]])*self.x_diff_ratios[i]) for i in range(self.n)]

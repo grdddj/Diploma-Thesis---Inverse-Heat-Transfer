@@ -7,23 +7,26 @@ We are identifying the values that yield the smallest product
 
 import os
 import json
-import matplotlib.pyplot as plt
 
+directory_for_results = 'Parameters testing'
 file_name = "1578140846-4rep-inverse.json"
 
-WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-directory_for_results = os.path.join(WORKING_DIRECTORY, 'Parameters testing')
-file_name_full = os.path.join(directory_for_results, file_name)
 
-def get_data():
-    with open(file_name_full, "r") as json_file:
+def get_data(file_name):
+    """
+    Simply getting data from specified json file name and returning them
+        in the form of a python dictionary
+    """
+
+    with open(file_name, "r") as json_file:
         content = json.load(json_file)
     return content
 
-def analyse_data():
-    data = get_data()
 
-    print(data.keys())
+def analyse_data(data):
+    """
+    Analysing the inputted data and returning the optimal values
+    """
 
     optimal_values = {}
 
@@ -54,6 +57,12 @@ def analyse_data():
 
     return optimal_values
 
+
 if __name__ == '__main__':
-    result = analyse_data()
+    WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    directory_for_results_full = os.path.join(WORKING_DIRECTORY, directory_for_results)
+    file_name_full = os.path.join(directory_for_results_full, file_name)
+
+    data = get_data(file_name_full)
+    result = analyse_data(data)
     print(result)

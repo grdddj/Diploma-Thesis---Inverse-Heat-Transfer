@@ -1,8 +1,12 @@
 import numpy as np  # this has some nice mathematics related functions
-from scipy.sparse import csr_matrix, diags  # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
-from scipy.sparse.linalg import spsolve    # this guy can solve equation faster by taking advantage of the sparsity (it ignores zeros in the matrices)
-from experiment_data_handler import Experimental_data, Material
-from interpolations import Predefined_interp_for_float, Predefined_interp_for_list
+# using so called sparse linear algebra make stuff run way faster (ignoring zeros)
+from scipy.sparse import csr_matrix, diags
+# this guy can solve equation faster by taking advantage of the sparsity
+#   (it ignores zeros in the matrices)
+from scipy.sparse.linalg import spsolve
+from experiment_data_handler import ExperimentalData
+from interpolations import PredefinedInterpForFloat, PredefinedInterpForList
+
 
 class Simulation:  # In later objects abreviated as Sim
     """
@@ -16,7 +20,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.N = int(N)  # number of elements in the model
         self.dt = dt  # fixed time step
         self.theta = theta  # fixed integration method
-        self.Exp_data = Experimental_data(experiment_data_path)
+        self.Exp_data = ExperimentalData(experiment_data_path)
 
         # A lot of properties can be either chosen (in GUI), or defined in a CSV
         # TODO: let user choose one or another, at least in material
@@ -28,8 +32,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.x0 = x0 if x0 is not None else self.Exp_data.x0
 
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)  # Placeholder for the fixed simulation time points
-        self.current_t_forward = 0 # Storing current time for quick lookup in the forward callback
-        self.current_t_inverse = 0 # Storing current time for quick lookup in the inverse callback
+        self.current_t = 0  # Current time for quick lookup in the callback
         self.max_step_idx = len(self.t) - 1  # maximum allowed index when simulating
         self.current_step_idx = 0  # current time step index
         self.checkpoint_step_idx = 0  # checkpoint time step index
@@ -51,9 +54,9 @@ class Simulation:  # In later objects abreviated as Sim
         # This way it does not spend any time on if statements during simulation
         try:
             len(self.x0)
-            self.T_x0_interpolator = Predefined_interp_for_list(self.x0, self.x)
-        except:
-            self.T_x0_interpolator = Predefined_interp_for_float(self.x0, self.x)
+            self.T_x0_interpolator = PredefinedInterpForList(self.x0, self.x)
+        except TypeError:
+            self.T_x0_interpolator = PredefinedInterpForFloat(self.x0, self.x)
         self.T_x0[0] = self.T_x0_interpolator(self.T)  # save initial T_x0
         # TODO: make it allow multiple probes at the same time
 
@@ -66,17 +69,37 @@ class Simulation:  # In later objects abreviated as Sim
         self.K = csr_matrix((1/self.dx)*self.lmbd*diags([-1, 2, -1], [-1, 0, 1], shape=(N+1, N+1)))
 
         # We have to make some changes to the matrix K because we affect the body from outside
-        self.K[0,0] /= 2  # Here we will push Heat to the body - Neumann Boundary Condition
-        self.K[N,N] /= 2  # Here we know the body is in contact with air so it will cool accordingly - Robin Boundary Condition
+        self.K[0, 0] /= 2  # Here we will push Heat to the body - Neumann Boundary Condition
+        self.K[N, N] /= 2  # Here we know the body is in contact with air so it will cool accordingly - Robin Boundary Condition
 
         # Preparing variables to store the values of some properties, that are constant during the simulation
         self.A = self.M + self.dt*self.theta*self.K  # placeholder for matrix A
-        self.A[-1,-1] += self.dt*self.theta*self.robin_alpha  # implicit portion of T_body contribution (Robin BC Nth node)
+        self.A[-1, -1] += self.dt*self.theta*self.robin_alpha  # implicit portion of T_body contribution (Robin BC Nth node)
         self.b_base = self.M - self.dt*(1-self.theta)*self.K  # Matrix b to calculate boundary vector b
         self.b = np.empty(N+1)  # allocate memory for vector b
 
+    def __repr__(self):
+        """
+        Defining what should be displayed when we print the
+            object of this class.
+        Very useful for debugging purposes.
+        """
+
+        return f"""
+            self.N: {self.N},
+            self.dt: {self.dt},
+            self.theta: {self.theta},
+            self.length: {self.length},
+            self.rho: {self.rho},
+            self.cp: {self.cp},
+            self.lmbd: {self.lmbd},
+            self.length: {self.length},
+            self.robin_alpha: {self.robin_alpha},
+            self.x0: {self.x0},
+            """
+
     # Function that calculates new timestep (integration step)
-    def evaluate_one_step(self):
+    def evaluate_one_step(self, increment_simulation_time=True):
         """
         Simulating one step of the simulation
         Is using already initialised instance variables
@@ -92,19 +115,22 @@ class Simulation:  # In later objects abreviated as Sim
 
         # solve the equation self.A*self.T=b
         self.T = spsolve(self.A, self.b)  # solve new self.T for the new step
-        #self.T_x0.append(np.interp(self.Exp_data.x0, self.x, self.T))  # save data from the temperature probes  # switich off for now
         self.current_step_idx += 1  # move to new timestep
         self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)
-        self.current_t_forward += self.dt # Updating time info for the callback
 
-    def evaluate_N_steps(self, N=1):
+        # Condition added not to increment time when we are calling this
+        #   function multiple times for every step - as in inverse problem
+        if increment_simulation_time:
+            self.current_t += self.dt  # Updating time info for the callback
+
+    def evaluate_n_steps(self, n_steps=1, increment_simulation_time=True):
         """
         Running the evaluate_one_step() function multiple times
         """
 
         step = 0
-        while self.current_step_idx < self.max_step_idx and step < N:
-            self.evaluate_one_step()
+        while self.current_step_idx < self.max_step_idx and step < n_steps:
+            self.evaluate_one_step(increment_simulation_time)
             step += 1
 
     def make_checkpoint(self):

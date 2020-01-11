@@ -11,22 +11,26 @@ import json
 import matplotlib.pyplot as plt
 
 # Defining the file with data, and whether to use logarithmic scale on x-axis
+directory_for_results = 'Parameters testing'
 file_name = "1578140846-4rep-inverse.json"
 LOGARITHMIC_X_AXIS = True
 
-WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-directory_for_results = os.path.join(WORKING_DIRECTORY, 'Parameters testing')
-file_name_full = os.path.join(directory_for_results, file_name)
 
-def get_data():
-    with open(file_name_full, "r") as json_file:
+def get_data(file_name):
+    """
+    Simply getting data from specified json file name and returning them
+        in the form of a python dictionary
+    """
+
+    with open(file_name, "r") as json_file:
         content = json.load(json_file)
     return content
 
-def show_data():
-    data = get_data()
 
-    print(data.keys())
+def show_data(data):
+    """
+    Showing the inputted data and saving them to a plot
+    """
 
     for parameter in data.keys():
         elem = data[parameter]
@@ -59,7 +63,7 @@ def show_data():
         plt.title("Parameters testing - {}".format(parameter))
 
         if LOGARITHMIC_X_AXIS:
-            plt.xscale('log') # Creating logarithmic scale on x-axis
+            plt.xscale('log')  # Creating logarithmic scale on x-axis
 
         plt.grid()
 
@@ -71,5 +75,11 @@ def show_data():
 
         plt.clf()
 
+
 if __name__ == '__main__':
-    show_data()
+    WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    directory_for_results_full = os.path.join(WORKING_DIRECTORY, directory_for_results)
+    file_name_full = os.path.join(directory_for_results_full, file_name)
+
+    data = get_data(file_name_full)
+    show_data(data)

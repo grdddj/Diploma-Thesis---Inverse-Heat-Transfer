@@ -14,6 +14,7 @@ Therefore I decided to unify it in only one class - with the point that
     one more if-statement cannot ruin the performance.
 """
 
+
 class Predefined_interp:
     """
     Class responsible for handling the quick interpolation in predefined
@@ -25,7 +26,7 @@ class Predefined_interp:
         Initialising all the internal variables
         """
 
-        self.indexes = self.find_interp_indexes(x0,x)
+        self.indexes = self.find_interp_indexes(x0, x)
         self.n = len(self.indexes)
 
         # Determining where exactly is the x0 point in relation to the

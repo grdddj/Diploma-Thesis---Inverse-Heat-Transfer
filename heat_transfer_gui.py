@@ -32,13 +32,10 @@ Benefits of moving from TKinter to PyQt involve:
             if necessary, is certainly useful.
 
 TODOS:
-    - address the "error_value: nan" bug when simulation is "stopped" when not running
-    - create a small window where to put important notices in the GUI
     - create some area where to show error messages to the user
         - or create a popup window with the same intent
     - discuss the formats and savings of csv and pgn results
     - find out how to make the left arguments-menu not occupy the whole height
-    - add documentation to classes and functions
     - have an eye on speed - maybe it could even handle some multiprocessing
         - (or that FeniCS library)
     - think about the imports
@@ -62,39 +59,32 @@ TODOS FROM Tests.py:
         - consider showing the properties in the menu/next to it
         - consider moving materials to the DB (SQLite3)
     - improve the design of the menus and buttons
-    - look up the cx_Freeze to-exe module, as pyinstaller produces 300 MB .exe
-        - cx_Freeze offers deletion of unused libraries (scipy etc.)
-    - create second thread (process) that is responsible for the calculation
-        - IDEA: running the calculation as a separate script, output the
-                results to the text_file and draw it continually from there
     - offer "run calculation on background" possibility (without any visual output)
     - parameters that could be inputted from the user:
-        - the type of algorithm
         - the plotting period also in "normal" seconds - to show progress periodically
 """
 
-from PyQt5.uic import loadUiType
-from PyQt5 import QtWidgets, QtGui, QtCore
-
 import sys
 import time
-
 import threading
 import queue
 
-import heat_transfer_simulation
-import heat_transfer_simulation_inverse
+from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5.uic import loadUiType
 
-from heat_transfer_workers import Worker, WorkerSignals
+import heat_transfer_simulation
+import heat_transfer_simulation_inverse_inheritance
+
+from heat_transfer_workers import Worker
 
 from heat_transfer_plot_temperature import TemperaturePlotCanvas
 from heat_transfer_plot_heatflux import HeatFluxPlotCanvas
 
 from heat_transfer_materials import MaterialService
-material_service = MaterialService()
-
 from heat_transfer_user_inputs_classic import UserInputServiceClassic
 from heat_transfer_user_inputs_inverse import UserInputServiceInverse
+
+material_service = MaterialService()
 user_input_service_classic = UserInputServiceClassic()
 user_input_service_inverse = UserInputServiceInverse()
 
@@ -103,10 +93,13 @@ user_input_service_inverse = UserInputServiceInverse()
 #   - worth a try later, now for development purposes this is more comfortable
 Ui_MainWindow, QMainWindow = loadUiType('heat_transfer_gui.ui')
 
+
 class HeatTransferWindow(QMainWindow, Ui_MainWindow):
     """
-
+    Class holding the whole GUI
+    It stores all the internal variables and behaviors
     """
+
     def __init__(self, ):
         super(HeatTransferWindow, self).__init__()
         self.setupUi(self)
@@ -157,6 +150,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Function to put together the state-change and the specific button
             highlighting that is connected with the new state.
         """
+
         self.simulation_state = new_state
         if update_buttons:
             self.update_state_for_the_user()
@@ -168,6 +162,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         We are just playing with the width of the border.
         Also mentioning the simulation state in the user info label.
         """
+
         # TODO: research some better way, as this is quite awkward, to assign
         #       always the whole stylesheet
         font = 'font: 20pt "MS Shell Dlg 2";'
@@ -200,6 +195,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Completely empties the inputted layout, and makes it ready for
             new information.
         """
+
         while layout.count():
             child = layout.takeAt(0)
             if child.widget() is not None:
@@ -211,6 +207,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Shows arbitrary message (general info or error) to the user.
         """
+
         print(message)
         self.info_label.setText(message)
 
@@ -229,6 +226,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Making sure each algorithm has it's own custom user inputs
         """
+
         # TODO: maybe the algorithm an material choice could stay, and
         #       only inputs themselves could be deleted and recreated
         # Clearing the whole layout and filling it again
@@ -243,6 +241,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Including the checkboxes for user to choose if to save data or not
         """
+
         new_layout = QtWidgets.QHBoxLayout()
 
         self.save_plots_checkbox = QtWidgets.QCheckBox("Save plots")
@@ -257,6 +256,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Including the radio buttons for user to choose the algorithm
         """
+
         new_layout = QtWidgets.QHBoxLayout()
 
         label = QtWidgets.QLabel("Algorithm choice:")
@@ -286,6 +286,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Including the labels and input fields for all the input data that
             are required for a current situation (algorithm)
         """
+
         for entry in self.get_current_input_service().number_parameters_to_get_from_user:
             new_layout = QtWidgets.QHBoxLayout()
 
@@ -308,6 +309,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Simplifies the choice of user input service
         """
+
         if self.radio_choice_classic.isChecked():
             return user_input_service_classic
         elif self.radio_choice_inverse.isChecked():
@@ -317,6 +319,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Simplifies the access to current algorithm
         """
+
         if self.radio_choice_classic.isChecked():
             return "classic"
         elif self.radio_choice_inverse.isChecked():
@@ -332,6 +335,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Depends on all the inputted elements to have a certain structure,
             to be processed the right way.
         """
+
         values_dictionary = {}
         for element in self.get_current_input_service().number_parameters_to_get_from_user:
             try:
@@ -354,6 +358,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         Adding the menu with all possible materials users can choose
         """
+
         new_layout = QtWidgets.QHBoxLayout()
 
         self.material_combo_box = QtWidgets.QComboBox()
@@ -375,6 +380,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         What to do when simulation is over
         """
+
         print("SIMULATION FINISHED!!")
         # Allowing all the fields for editing again
         self.lock_inputs_for_editing(False)
@@ -395,6 +401,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         What to do when simulation is paused
         Having it enabled only when the simulation is running
         """
+
         if self.simulation_state == "running":
             self.set_simulation_state("paused")
             print("PAUSING THE SIMULATION!!!!")
@@ -406,6 +413,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         What to do when a simulation is stopped
         Having it enabled only when the simulation is running or paused
         """
+
         if self.simulation_state in ["running", "paused"]:
             self.set_simulation_state("stopped")
             print("STOPPING THE SIMULATION!!!!")
@@ -416,6 +424,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         """
         What to do when a Run button is clicked.
         """
+
         if self.simulation_state == "running":
             print("SIMULATION IS ALREADY RUNNING!!!")
             return
@@ -432,7 +441,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         # Getting current material from GUI and it's peoperties from the service
         self.chosen_material = self.material_combo_box.currentText()
-        current_material_properties = (material_service.materials_properties_dict[self.chosen_material])
+        current_material_properties = material_service.materials_properties_dict[self.chosen_material]
 
         # Getting all other user input for the simulation
         parameters = self.get_numbers_from_the_user_input()
@@ -458,18 +467,18 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             "heat_flux_plot": self.heat_flux_plot,
             "queue": self.queue,
             "parameters": parameters,
-            "save_results": self.save_data_checkbox.isChecked()
+            "save_results": self.save_data_checkbox.isChecked(),
         }
 
         # Running the specific simulation
         if self.get_current_algorithm() == "classic":
             print("classic")
-            worker = Worker(heat_transfer_simulation.run_simulation,
-                            **common_arguments_to_workers)
+            worker = Worker(heat_transfer_simulation.simulate_from_gui,
+                            common_arguments_to_workers)
         elif self.get_current_algorithm() == "inverse":
             print("inverse")
-            worker = Worker(heat_transfer_simulation_inverse.run_inverse_simulation,
-                            **common_arguments_to_workers)
+            worker = Worker(heat_transfer_simulation_inverse_inheritance.simulate_from_gui,
+                            common_arguments_to_workers)
 
         # Opening some additional communication channels with the workers
         worker.signals.result.connect(self.process_output)
@@ -486,11 +495,12 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Parameters:
             simulation_state (int) Whether the simulation is running (1) or not (0)
         """
+
         now = time.time()
 
         if simulation_state == 1:
             # Handle transition from paused to running
-            if self.time_is_running == False:
+            if self.time_is_running is False:
                 self.time_is_running = True
                 self.time_spent_paused += now - self.simulation_paused_timestamp
 
@@ -499,7 +509,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             self.update_time_label(elapsed_time)
         elif simulation_state == 0:
             # Handle transition from running to paused, otherwise do nothing
-            if self.time_is_running == True:
+            if self.time_is_running is True:
                 self.time_is_running = False
                 self.simulation_paused_timestamp = now
 
@@ -511,18 +521,21 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         Updates the time value in the time label
         Showing the value in seconds with the precision of 2 decimal places
         """
+
         self.time_label_2.setText("TIME: {} s".format(round(time_value, 2)))
 
     def update_error_label(self, error_value):
         """
         Updates the error value in the error label
         """
+
         self.error_label_2.setText("ERROR: {}".format(error_value))
 
     def process_output(self, returned_object):
         """
         Displaying the information returned after the simulation has finished
         """
+
         print(returned_object)
         # TODO: create a function to change this error, and to colour it accordingly
         self.update_error_label(returned_object["error_value"])
@@ -534,6 +547,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             lock  (bool) ... If the inputs should be locked (True)
                              or unlocked (False)
         """
+
         # TODO: find out how to disable the algorithm radio button
         #   maybe https://stackoverflow.com/questions/11472284/how-to-set-a-read-only-checkbox-in-pyside-pyqt
 
@@ -544,10 +558,12 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # (Un)locking the material menu
         self.material_combo_box.setEnabled(not lock)
 
+
 if __name__ == '__main__':
     # Necessary stuff for errors and exceptions to be thrown
     # Without this, the app just dies and says nothing
     sys._excepthook = sys.excepthook
+
     def exception_hook(exctype, value, traceback):
         print(exctype, value, traceback)
         sys._excepthook(exctype, value, traceback)

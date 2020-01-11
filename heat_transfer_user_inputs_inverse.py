@@ -2,6 +2,7 @@
 This module is responsible for defining information we want to get from user.
 """
 
+
 class UserInputServiceInverse:
     def __init__(self):
         self.number_parameters_to_get_from_user = [

@@ -4,7 +4,13 @@ This module is responsible for getting and storing material data.
 
 import csv
 
+
 class MaterialService:
+    """
+    Class holding information about all the available materials
+        and their properties
+    """
+
     materials_name_list = []
     materials_properties_dict = {}
 
@@ -12,7 +18,8 @@ class MaterialService:
         self.materials_properties_dict = self.get_materials_from_csv_file()
         self.materials_name_list = [key for key in self.materials_properties_dict]
 
-    def get_materials_from_csv_file(self):
+    @staticmethod
+    def get_materials_from_csv_file():
         """
         Transfers material data from the CSV file into a python dictionary,
             to be able to work with these data.
@@ -24,9 +31,9 @@ class MaterialService:
         materials_dictionary = {}
         # TODO: add some error handling
         with open("metals_properties.csv", "r") as materials_file:
-            csvReader = csv.reader(materials_file)
-            next(csvReader, None)  # skip first line (headers)
-            for row in csvReader:
+            csv_reader = csv.reader(materials_file)
+            next(csv_reader, None)  # skip first line (headers)
+            for row in csv_reader:
                 if row:
                     name = row[0]
                     material_properties = {}
