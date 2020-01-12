@@ -3,7 +3,7 @@ This module is testing the impact the change of input parameters
     has to the result (the time and error of the simulation)
 """
 
-import numpy as np
+import numpy as np  # type: ignore
 
 from parameters_testing_utilities import aggregate_all_tests
 from heat_transfer_simulation_inverse_inheritance import create_and_run_simulation

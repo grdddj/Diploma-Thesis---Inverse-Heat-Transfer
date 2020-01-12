@@ -12,7 +12,7 @@ directory_for_results = 'Parameters testing'
 file_name = "1578140846-4rep-inverse.json"
 
 
-def get_data(file_name):
+def get_data(file_name:str ) -> dict:
     """
     Simply getting data from specified json file name and returning them
         in the form of a python dictionary
@@ -23,7 +23,7 @@ def get_data(file_name):
     return content
 
 
-def analyse_data(data):
+def analyse_data(data: dict) -> list:
     """
     Analysing the inputted data and returning the optimal values
     """

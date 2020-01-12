@@ -6,10 +6,11 @@ import json
 import time
 import os
 from collections import defaultdict
-import matplotlib.pyplot as plt
+from typing import Callable, Dict, Any
+import matplotlib.pyplot as plt  # type: ignore
 
 
-def _get_average_values_from_results(results):
+def _get_average_values_from_results(results: dict) -> dict:
     """
     Is averaging values from multiple simulations, to account for the fact
         that CPU can have different speed at different times
@@ -58,7 +59,7 @@ def _get_average_values_from_results(results):
     }
     """
 
-    averages = defaultdict(dict)
+    averages: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(dict)
 
     # Filling the averages with the empty data, to be filled later
     for parameter, simulation_list in results.items():
@@ -91,7 +92,9 @@ def _get_average_values_from_results(results):
     return averages
 
 
-def show_data_in_jpg(data, file_name, description="classic"):
+def show_data_in_jpg(data: dict,
+                     file_name: str,
+                     description: str = "classic") -> None:
     """
     Visualises the results in multiple graphs
     """
@@ -138,8 +141,12 @@ def show_data_in_jpg(data, file_name, description="classic"):
         plt.clf()
 
 
-def run_simulation(simulation_func, temperature_plot=None, heat_flux_plot=None,
-                   progress_callback=None, queue=None, parameters=None):
+def run_simulation(simulation_func: Callable,
+                   parameters: dict,
+                   temperature_plot=None,
+                   heat_flux_plot=None,
+                   progress_callback=None,
+                   queue=None) -> dict:
     """
     Runs one simulation with inputted parameters and returns the time and
         error of the simulation
@@ -158,7 +165,9 @@ def run_simulation(simulation_func, temperature_plot=None, heat_flux_plot=None,
     }
 
 
-def run_multiple_simulations(simulation_func, parameter, values):
+def run_multiple_simulations(simulation_func: Callable,
+                             parameter: str,
+                             values: list) -> dict:
     """
     Runs simulations multiple times for all inputted values, that are
         meant to modify certain parameter, and should change the results
@@ -199,13 +208,15 @@ def run_multiple_simulations(simulation_func, parameter, values):
     return results
 
 
-def aggregate_all_tests(simulation_func, testing_scenarios,
-                        no_of_repetitions=1, description="classic"):
+def aggregate_all_tests(simulation_func: Callable,
+                        testing_scenarios: list,
+                        no_of_repetitions: int = 1,
+                        description: str = "classic"):
     """
     Running all the testing scenarios specified number of times
     """
 
-    results = defaultdict(list)
+    results: Dict[str, list] = defaultdict(list)
 
     # Running the tests multiple times, to account for variable CPU speed
     for _ in range(no_of_repetitions):

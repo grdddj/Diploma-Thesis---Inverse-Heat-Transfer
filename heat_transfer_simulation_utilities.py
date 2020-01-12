@@ -7,6 +7,7 @@ It can be easily imported and used for any simulation that
 
 import csv
 import time
+from typing import Callable
 
 
 class Callback:
@@ -15,11 +16,15 @@ class Callback:
         should share the results with the outside world
     """
 
-    def __init__(self, call_at=500.0, heat_flux_plot=None,
-                 temperature_plot=None, queue=None, progress_callback=None,
-                 not_replot_heatflux=False):
+    def __init__(self,
+                 call_at: float = 500.0,
+                 heat_flux_plot=None,
+                 temperature_plot=None,
+                 queue=None,
+                 progress_callback=None,
+                 not_replot_heatflux: bool = False) -> None:
         self.call_at = call_at  # how often to be called
-        self.last_call = 0  # time in which the callback was last called
+        self.last_call = 0.0  # time in which the callback was last called
 
         # Takes reference of some plot, which it should update, and some queue,
         #   through which the GUI will send information.
@@ -38,7 +43,7 @@ class Callback:
         #   changed only through the queue by input from GUI
         self.simulation_state = "running"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Defining what should be displayed when we print the
             object of this class.
@@ -54,7 +59,9 @@ class Callback:
             self.not_replot_heatflux: {self.not_replot_heatflux},
             """
 
-    def __call__(self, Sim, force_update=False):
+    def __call__(self,
+                 Sim,
+                 force_update: bool = False) -> str:
         """
         Defining what should happend when the callback will be called
         """
@@ -116,12 +123,21 @@ class SimulationController:
     Holding variables and defining methods for the simulation
     """
 
-    def __init__(self, Sim, parameters, next_step_func, calculate_error_func,
-                 algorithm=None, time_data_location=None,
-                 quantity_data_location=None, quantity_and_unit=None,
-                 progress_callback=None, queue=None,
-                 temperature_plot=None, heat_flux_plot=None,
-                 not_replot_heatflux=False, save_results=False):
+    def __init__(self,
+                 Sim,
+                 parameters: dict,
+                 next_step_func: str,
+                 calculate_error_func: Callable,
+                 algorithm: str = "",
+                 time_data_location: str = "",
+                 quantity_data_location: str = "",
+                 quantity_and_unit: str = "",
+                 progress_callback=None,
+                 queue=None,
+                 temperature_plot=None,
+                 heat_flux_plot=None,
+                 not_replot_heatflux: bool = False,
+                 save_results: bool = False):
         self.Sim = Sim
         self.MyCallBack = Callback(progress_callback=progress_callback,
                                    call_at=parameters["callback_period"],
@@ -138,7 +154,7 @@ class SimulationController:
         self.calculate_error_func = calculate_error_func
         self.error_norm = None
 
-    def complete_simulation(self):
+    def complete_simulation(self) -> dict:
         """
         Running all the simulation steps, if not stopped
         """
@@ -168,7 +184,7 @@ class SimulationController:
 
         return {"error_value": self.error_norm}
 
-    def save_results_to_csv_file(self):
+    def save_results_to_csv_file(self) -> None:
         """
         Outputs the (semi)results of a simulation into a CSV file and names it
             accordingly.

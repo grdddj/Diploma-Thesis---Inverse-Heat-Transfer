@@ -3,6 +3,7 @@ This module is responsible for getting and storing material data.
 """
 
 import csv
+from typing import List, Dict
 
 
 class MaterialService:
@@ -11,15 +12,15 @@ class MaterialService:
         and their properties
     """
 
-    materials_name_list = []
-    materials_properties_dict = {}
+    materials_name_list: List[str] = []
+    materials_properties_dict: Dict[str, dict] = {}
 
     def __init__(self):
         self.materials_properties_dict = self.get_materials_from_csv_file()
         self.materials_name_list = [key for key in self.materials_properties_dict]
 
     @staticmethod
-    def get_materials_from_csv_file():
+    def get_materials_from_csv_file() -> dict:
         """
         Transfers material data from the CSV file into a python dictionary,
             to be able to work with these data.

@@ -4,13 +4,13 @@ It can be run separately or from the GUI, in which case
     it will be updating the plot.
 """
 
-import numpy as np
+import numpy as np  # type: ignore
 from NumericalForward import Simulation
 from experiment_data_handler import Material
 from heat_transfer_simulation_utilities import SimulationController
 
 
-def calculate_error(Sim):
+def calculate_error(Sim) -> float:
     """
     Function that calculates error value for this simulation
     """
@@ -19,17 +19,20 @@ def calculate_error(Sim):
     return round(error, 3)
 
 
-def simulate_from_gui(parameters_from_gui, progress_callback):
+def simulate_from_gui(parameters_from_gui: dict) -> dict:
     """
     Starts the whole simulation with the inputs from GUI
     """
 
-    return create_and_run_simulation(**parameters_from_gui,
-                                     progress_callback=progress_callback)
+    return create_and_run_simulation(**parameters_from_gui)
 
 
-def create_and_run_simulation(parameters, temperature_plot=None, progress_callback=None,
-                              heat_flux_plot=None, queue=None, save_results=False):
+def create_and_run_simulation(parameters: dict,
+                              temperature_plot=None,
+                              progress_callback=None,
+                              heat_flux_plot=None,
+                              queue=None,
+                              save_results: bool = False) -> dict:
     """
     Creates a new simulation object, passes it into the controller
         and makes sure the simulation will finish

@@ -17,6 +17,8 @@ In the end however, I decided to leave it like this, because it is a
     technique that I could describe in the thesis itself.
 """
 
+from typing import List, Union
+
 
 class PredefinedInterp:
     """
@@ -24,7 +26,9 @@ class PredefinedInterp:
         important internal variables.
     """
 
-    def __init__(self, x0, x):
+    def __init__(self,
+                 x0: Union[list, float],
+                 x: list):
         self.indexes = self.find_interp_indexes(x0, x)
         self.n = len(self.indexes)
 
@@ -33,10 +37,11 @@ class PredefinedInterp:
         if self.n == 1:
             self.x_diff_ratios = (x0-x[self.indexes[0]])/(x[self.indexes[0]+1] - x[self.indexes[0]])
         else:
-            self.x_diff_ratios = [(x0[i]-x[self.indexes[i]])/(x[self.indexes[i]+1] - x[self.indexes[i]]) for i in range(self.n)]
+            self.x_diff_ratios = [(x0[i]-x[self.indexes[i]])/(x[self.indexes[i]+1] - x[self.indexes[i]]) for i in range(self.n)]  # type: ignore
 
     @staticmethod
-    def find_interp_indexes(x0, x):
+    def find_interp_indexes(x0: Union[list, float],
+                            x: list) -> list:
         """
         Finding out the right indexes of all x0 values in the x list,
             so that we can then interpolate from list almost instantly
@@ -52,14 +57,14 @@ class PredefinedInterp:
         #   could be operating on all iterables (lists, tuples, numpy arrays),
         #   it is the easiest one to implement for everything
         try:
-            len(x0)
+            len(x0)  # type: ignore
         except TypeError:
             x0 = [x0]
 
         # Looping through all the x0 values (even if there is only one) and
         #   searching for the index whose value is less than the x0 value,
         #   but the further index is already bigger than the x0 value
-        for item_x0 in x0:
+        for item_x0 in x0:  # type: ignore
             idx = 0
             while x[idx] < item_x0:
                 idx += 1
@@ -76,7 +81,7 @@ class PredefinedInterpForFloat(PredefinedInterp):
         only at one place
     """
 
-    def __call__(self, y):
+    def __call__(self, y: list) -> float:
         return y[self.indexes[0]]+((y[self.indexes[0]+1] - y[self.indexes[0]])*self.x_diff_ratios)
 
 
@@ -88,5 +93,5 @@ class PredefinedInterpForList(PredefinedInterp):
         (the temperature should be determined at more places)
     """
 
-    def __call__(self, y):
+    def __call__(self, y: list) -> List[float]:
         return [y[self.indexes[i]]+((y[self.indexes[i]+1] - y[self.indexes[i]])*self.x_diff_ratios[i]) for i in range(self.n)]

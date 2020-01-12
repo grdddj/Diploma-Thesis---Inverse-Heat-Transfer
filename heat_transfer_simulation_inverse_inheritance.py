@@ -4,13 +4,14 @@ It can be run separately or from the GUI, in which case
     it will be updating the plot.
 """
 
-import numpy as np
+from typing import Union
+import numpy as np  # type: ignore
 from NumericalInverse_inheritance import InverseSimulation
 from experiment_data_handler import Material
 from heat_transfer_simulation_utilities import SimulationController
 
 
-def calculate_error(Sim):
+def calculate_error(Sim) -> Union[float, str]:
     """
     Function that calculates error value for this simulation
     """
@@ -30,16 +31,20 @@ def calculate_error(Sim):
         return "unknown"
 
 
-def simulate_from_gui(parameters_from_gui, progress_callback):
+def simulate_from_gui(parameters_from_gui: dict) -> dict:
     """
     Starts the whole simulation with the inputs from GUI
     """
 
-    return create_and_run_simulation(**parameters_from_gui, progress_callback=progress_callback)
+    return create_and_run_simulation(**parameters_from_gui)
 
 
-def create_and_run_simulation(parameters, temperature_plot=None, progress_callback=None,
-                              heat_flux_plot=None, queue=None, save_results=False):
+def create_and_run_simulation(parameters,
+                              temperature_plot=None,
+                              progress_callback=None,
+                              heat_flux_plot=None,
+                              queue=None,
+                              save_results: bool = False) -> dict:
     """
     Creates a new simulation object, passes it into the controller
         and makes sure the simulation will finish
@@ -54,6 +59,8 @@ def create_and_run_simulation(parameters, temperature_plot=None, progress_callba
                             dt=parameters["dt"],
                             x0=parameters["place_of_interest"],
                             window_span=parameters["window_span"],
+                            q_init=20.0,
+                            init_q_adjustment=10,
                             tolerance=parameters["tolerance"])
 
     sim_controller = SimulationController(Sim=Sim,

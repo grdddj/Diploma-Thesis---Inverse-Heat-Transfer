@@ -8,7 +8,7 @@ There is a possibility of having x-axis in a logarithmic scale,
 
 import os
 import json
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore
 
 # Defining the file with data, and whether to use logarithmic scale on x-axis
 directory_for_results = 'Parameters testing'
@@ -16,7 +16,7 @@ file_name = "1578140846-4rep-inverse.json"
 LOGARITHMIC_X_AXIS = True
 
 
-def get_data(file_name):
+def get_data(file_name: str) -> dict:
     """
     Simply getting data from specified json file name and returning them
         in the form of a python dictionary
@@ -27,7 +27,7 @@ def get_data(file_name):
     return content
 
 
-def show_data(data):
+def show_data(data: dict):
     """
     Showing the inputted data and saving them to a plot
     """

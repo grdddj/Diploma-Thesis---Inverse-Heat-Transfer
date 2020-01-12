@@ -4,10 +4,10 @@ This module is responsible for setting the plot and defining it's behaviors.
 
 import os
 import time
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets  # type: ignore
 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import (
+from matplotlib.figure import Figure  # type: ignore
+from matplotlib.backends.backend_qt5agg import (  # type: ignore
     FigureCanvasQTAgg as FigureCanvas)
 
 
@@ -32,7 +32,7 @@ class HeatFluxPlotCanvas(FigureCanvas):
         self.plot()
 
     def plot(self, x_values=None, y_values=None,
-             x_experiment_values=None, y_experiment_values=None):
+             x_experiment_values=None, y_experiment_values=None) -> None:
         """
         Plotting the inputted values of heat flux
         """
@@ -60,7 +60,9 @@ class HeatFluxPlotCanvas(FigureCanvas):
         self.heat_flux_subplot.legend()
         self.draw()
 
-    def save_results_to_png_file(self, material, method):
+    def save_results_to_png_file(self,
+                                 material: str,
+                                 method: str) -> None:
         """
         Outputs the (semi)results of a simulation into a PNG file and names it
             accordingly.

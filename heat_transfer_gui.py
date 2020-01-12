@@ -69,8 +69,8 @@ import time
 import threading
 import queue
 
-from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.uic import loadUiType
+from PyQt5 import QtWidgets, QtGui, QtCore  # type: ignore
+from PyQt5.uic import loadUiType  # type: ignore
 
 import heat_transfer_simulation
 import heat_transfer_simulation_inverse_inheritance
@@ -94,7 +94,7 @@ user_input_service_inverse = UserInputServiceInverse()
 Ui_MainWindow, QMainWindow = loadUiType('heat_transfer_gui.ui')
 
 
-class HeatTransferWindow(QMainWindow, Ui_MainWindow):
+class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     """
     Class holding the whole GUI
     It stores all the internal variables and behaviors
@@ -145,7 +145,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         self.update_state_for_the_user()
 
-    def set_simulation_state(self, new_state, update_buttons=True):
+    def set_simulation_state(self,
+                             new_state: str,
+                             update_buttons: bool = True) -> None:
         """
         Function to put together the state-change and the specific button
             highlighting that is connected with the new state.
@@ -155,7 +157,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         if update_buttons:
             self.update_state_for_the_user()
 
-    def update_state_for_the_user(self):
+    def update_state_for_the_user(self) -> None:
         """
         Shows to the user in which state the simulation is - by highlighting
             specific button.
@@ -190,7 +192,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         elif self.simulation_state == "finished":
             self.show_message_to_user("Simulation finished. Click Run to start with new simulation.")
 
-    def clear_layout(self, layout):
+    def clear_layout(self, layout) -> None:
         """
         Completely empties the inputted layout, and makes it ready for
             new information.
@@ -203,7 +205,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             elif child.layout() is not None:
                 self.clear_layout(child.layout())
 
-    def show_message_to_user(self, message):
+    def show_message_to_user(self, message: str) -> None:
         """
         Shows arbitrary message (general info or error) to the user.
         """
@@ -211,7 +213,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         print(message)
         self.info_label.setText(message)
 
-    def show_error_dialog_to_user(self, error_message):
+    def show_error_dialog_to_user(self, error_message: str) -> None:
         """
         Displays a separate dialog (alert) informing user of something bad, like
             invalid user input.
@@ -222,7 +224,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         print(error_message)
 
-    def change_user_input(self):
+    def change_user_input(self) -> None:
         """
         Making sure each algorithm has it's own custom user inputs
         """
@@ -237,7 +239,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         self.add_material_choice(self.verticalLayout_6)
         self.add_user_inputs(self.verticalLayout_6)
 
-    def add_saving_choices(self, parent_layout):
+    def add_saving_choices(self, parent_layout) -> None:
         """
         Including the checkboxes for user to choose if to save data or not
         """
@@ -252,7 +254,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         parent_layout.addLayout(new_layout)
 
-    def add_algorithm_choice(self, parent_layout, specified_algorithm=None):
+    def add_algorithm_choice(self,
+                             parent_layout,
+                             specified_algorithm: str = None) -> None:
         """
         Including the radio buttons for user to choose the algorithm
         """
@@ -281,7 +285,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         parent_layout.addLayout(new_layout)
 
-    def add_user_inputs(self, parent_layout):
+    def add_user_inputs(self, parent_layout) -> None:
         """
         Including the labels and input fields for all the input data that
             are required for a current situation (algorithm)
@@ -315,7 +319,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         elif self.radio_choice_inverse.isChecked():
             return user_input_service_inverse
 
-    def get_current_algorithm(self):
+    def get_current_algorithm(self) -> str:
         """
         Simplifies the access to current algorithm
         """
@@ -325,7 +329,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         elif self.radio_choice_inverse.isChecked():
             return "inverse"
 
-    def get_numbers_from_the_user_input(self):
+        return "no algorithm"
+
+    def get_numbers_from_the_user_input(self) -> dict:
         """
         Getting number parameters from the user in the form of a dictionary.
             Dictionary is better than list, because we are defining everything
@@ -354,7 +360,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         return values_dictionary
 
-    def add_material_choice(self, parent_layout):
+    def add_material_choice(self, parent_layout) -> None:
         """
         Adding the menu with all possible materials users can choose
         """
@@ -376,7 +382,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # TODO: add a tooltip with information whenever the material is highlighted:
         #   https://www.tutorialspoint.com/pyqt/pyqt_qcombobox_widget.htm
 
-    def simulation_finished(self):
+    def simulation_finished(self) -> None:
         """
         What to do when simulation is over
         """
@@ -396,7 +402,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             self.temperature_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
             self.heat_flux_plot.save_results_to_png_file(material=self.chosen_material, method=self.get_current_algorithm())
 
-    def pause_simulation(self):
+    def pause_simulation(self) -> None:
         """
         What to do when simulation is paused
         Having it enabled only when the simulation is running
@@ -408,7 +414,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             # Sending signal to the calculating thread to have a rest
             self.queue.put("pause")
 
-    def stop_simulation(self):
+    def stop_simulation(self) -> None:
         """
         What to do when a simulation is stopped
         Having it enabled only when the simulation is running or paused
@@ -420,7 +426,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
             # Telling the calculating thread to give up
             self.queue.put("stop")
 
-    def run_simulation(self):
+    def run_simulation(self) -> None:
         """
         What to do when a Run button is clicked.
         """
@@ -488,7 +494,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # Tell the workers to start the job
         self.threadpool.start(worker)
 
-    def update_simulation_time(self, simulation_state):
+    def update_simulation_time(self, simulation_state: str) -> None:
         """
         Keeping the user notified about the time the simulation is taking.
         Is being called everytime the simulation will emit it's state.
@@ -516,7 +522,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
                 elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
                 self.update_time_label(elapsed_time)
 
-    def update_time_label(self, time_value):
+    def update_time_label(self, time_value: float) -> None:
         """
         Updates the time value in the time label
         Showing the value in seconds with the precision of 2 decimal places
@@ -524,14 +530,14 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 
         self.time_label_2.setText("TIME: {} s".format(round(time_value, 2)))
 
-    def update_error_label(self, error_value):
+    def update_error_label(self, error_value: float) -> None:
         """
         Updates the error value in the error label
         """
 
         self.error_label_2.setText("ERROR: {}".format(error_value))
 
-    def process_output(self, returned_object):
+    def process_output(self, returned_object: dict) -> None:
         """
         Displaying the information returned after the simulation has finished
         """
@@ -540,7 +546,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
         # TODO: create a function to change this error, and to colour it accordingly
         self.update_error_label(returned_object["error_value"])
 
-    def lock_inputs_for_editing(self, lock=True):
+    def lock_inputs_for_editing(self, lock: bool = True) -> None:
         """
         Locks or unlocks all the user inputs.
         Parameters:
@@ -562,7 +568,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):
 if __name__ == '__main__':
     # Necessary stuff for errors and exceptions to be thrown
     # Without this, the app just dies and says nothing
-    sys._excepthook = sys.excepthook
+    sys._excepthook = sys.excepthook  # type: ignore
 
     def exception_hook(exctype, value, traceback):
         print(exctype, value, traceback)

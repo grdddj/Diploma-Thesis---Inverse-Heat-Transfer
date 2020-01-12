@@ -1,9 +1,9 @@
-import numpy as np  # this has some nice mathematics related functions
+import numpy as np    # type: ignore # this has some nice mathematics related functions
 # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
-from scipy.sparse import csr_matrix, diags
+from scipy.sparse import csr_matrix, diags  # type: ignore
 # this guy can solve equation faster by taking advantage of the sparsity
 #   (it ignores zeros in the matrices)
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve  # type: ignore
 from experiment_data_handler import ExperimentalData
 from interpolations import PredefinedInterpForFloat, PredefinedInterpForList
 
@@ -15,8 +15,15 @@ class Simulation:  # In later objects abreviated as Sim
     theta = 1.0 - fully implicit 1st order, numerically stable.
     """
 
-    def __init__(self, N=100, dt=1.0, theta=0.5, experiment_data_path="DATA.csv",
-                 material=None, robin_alpha=None, x0=None, length=None):
+    def __init__(self,
+                 N: int,
+                 dt: float,
+                 theta: float,
+                 robin_alpha: float,
+                 x0: float,
+                 length: float,
+                 material,
+                 experiment_data_path: str = "DATA.csv") -> None:
         self.N = int(N)  # number of elements in the model
         self.dt = dt  # fixed time step
         self.theta = theta  # fixed integration method
@@ -32,7 +39,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.x0 = x0 if x0 is not None else self.Exp_data.x0
 
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)  # Placeholder for the fixed simulation time points
-        self.current_t = 0  # Current time for quick lookup in the callback
+        self.current_t = 0.0  # Current time for quick lookup in the callback
         self.max_step_idx = len(self.t) - 1  # maximum allowed index when simulating
         self.current_step_idx = 0  # current time step index
         self.checkpoint_step_idx = 0  # checkpoint time step index
@@ -53,11 +60,11 @@ class Simulation:  # In later objects abreviated as Sim
 
         # This way it does not spend any time on if statements during simulation
         try:
-            len(self.x0)
+            len(self.x0)  # type: ignore
             self.T_x0_interpolator = PredefinedInterpForList(self.x0, self.x)
         except TypeError:
-            self.T_x0_interpolator = PredefinedInterpForFloat(self.x0, self.x)
-        self.T_x0[0] = self.T_x0_interpolator(self.T)  # save initial T_x0
+            self.T_x0_interpolator = PredefinedInterpForFloat(self.x0, self.x)  # type: ignore
+        self.T_x0[0] = self.T_x0_interpolator(self.T)  # type: ignore # save initial T_x0
         # TODO: make it allow multiple probes at the same time
 
         # Finite element method: matrix assembly using 1st order continuous Galerkin elements
@@ -78,7 +85,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.b_base = self.M - self.dt*(1-self.theta)*self.K  # Matrix b to calculate boundary vector b
         self.b = np.empty(N+1)  # allocate memory for vector b
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Defining what should be displayed when we print the
             object of this class.
@@ -99,7 +106,7 @@ class Simulation:  # In later objects abreviated as Sim
             """
 
     # Function that calculates new timestep (integration step)
-    def evaluate_one_step(self, increment_simulation_time=True):
+    def evaluate_one_step(self, increment_simulation_time: bool = True) -> None:
         """
         Simulating one step of the simulation
         Is using already initialised instance variables
@@ -116,14 +123,16 @@ class Simulation:  # In later objects abreviated as Sim
         # solve the equation self.A*self.T=b
         self.T = spsolve(self.A, self.b)  # solve new self.T for the new step
         self.current_step_idx += 1  # move to new timestep
-        self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)
+        self.T_x0[self.current_step_idx] = self.T_x0_interpolator(self.T)  # type: ignore
 
         # Condition added not to increment time when we are calling this
         #   function multiple times for every step - as in inverse problem
         if increment_simulation_time:
             self.current_t += self.dt  # Updating time info for the callback
 
-    def evaluate_n_steps(self, n_steps=1, increment_simulation_time=True):
+    def evaluate_n_steps(self,
+                         n_steps: int = 1,
+                         increment_simulation_time: bool = True) -> None:
         """
         Running the evaluate_one_step() function multiple times
         """
@@ -133,7 +142,7 @@ class Simulation:  # In later objects abreviated as Sim
             self.evaluate_one_step(increment_simulation_time)
             step += 1
 
-    def make_checkpoint(self):
+    def make_checkpoint(self) -> None:
         """
         Saving the current temperature distribution, to be able to
             run experiments with heat fluxes and not losing the
@@ -143,7 +152,7 @@ class Simulation:  # In later objects abreviated as Sim
         self.checkpoint_step_idx = self.current_step_idx
         self.T_checkpoint[:] = self.T[:]
 
-    def revert_to_checkpoint(self):
+    def revert_to_checkpoint(self) -> None:
         """
         Restoring the temperature distribution that was previously saved
         """
