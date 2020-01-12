@@ -7,7 +7,6 @@ It can be easily imported and used for any simulation that
 
 import csv
 import time
-import numpy as np
 
 
 class Callback:
@@ -117,11 +116,12 @@ class SimulationController:
     Holding variables and defining methods for the simulation
     """
 
-    def __init__(self, Sim, parameters, algorithm, time_data_location,
-                 quantity_data_location, quantity_and_unit, save_results,
-                 next_step_func, calculate_error_func, progress_callback=None,
-                 temperature_plot=None, heat_flux_plot=None, queue=None,
-                 not_replot_heatflux=False):
+    def __init__(self, Sim, parameters, next_step_func, calculate_error_func,
+                 algorithm=None, time_data_location=None,
+                 quantity_data_location=None, quantity_and_unit=None,
+                 progress_callback=None, queue=None,
+                 temperature_plot=None, heat_flux_plot=None,
+                 not_replot_heatflux=False, save_results=False):
         self.Sim = Sim
         self.MyCallBack = Callback(progress_callback=progress_callback,
                                    call_at=parameters["callback_period"],

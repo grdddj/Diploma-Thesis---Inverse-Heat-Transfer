@@ -6,7 +6,7 @@ This module is testing the impact the change of input parameters
 import numpy as np
 
 from parameters_testing_utilities import aggregate_all_tests
-from heat_transfer_simulation import SimulationController
+from heat_transfer_simulation import create_and_run_simulation
 
 
 def perform_tests():
@@ -14,7 +14,6 @@ def perform_tests():
     Running all the test scenarios defined withing it
     """
 
-    simulation = SimulationController()
     no_of_repetitions = 5
     steps = 200
 
@@ -37,7 +36,7 @@ def perform_tests():
         }
     ]
 
-    aggregate_all_tests(simulation=simulation,
+    aggregate_all_tests(simulation_func=create_and_run_simulation,
                         testing_scenarios=testing_scenarios,
                         no_of_repetitions=no_of_repetitions,
                         description="classic")

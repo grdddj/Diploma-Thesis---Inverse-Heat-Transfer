@@ -138,32 +138,27 @@ def show_data_in_jpg(data, file_name, description="classic"):
         plt.clf()
 
 
-def run_simulation(simulation, temperature_plot=None, heat_flux_plot=None,
+def run_simulation(simulation_func, temperature_plot=None, heat_flux_plot=None,
                    progress_callback=None, queue=None, parameters=None):
     """
     Runs one simulation with inputted parameters and returns the time and
         error of the simulation
     """
 
-    start_time = time.time()
+    start_time = time.perf_counter()
 
-    simulation.prepare_simulation(progress_callback=progress_callback,
-                                  temperature_plot=temperature_plot,
-                                  heat_flux_plot=heat_flux_plot,
-                                  queue=queue,
-                                  parameters=parameters)
-    simulation.complete_simulation()
+    result = simulation_func(parameters=parameters)
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     time_diff = round(end_time - start_time, 3)
 
     return {
         "time": time_diff,
-        "error": simulation.error_norm
+        "error": result["error_value"]
     }
 
 
-def run_multiple_simulations(simulation, parameter, values):
+def run_multiple_simulations(simulation_func, parameter, values):
     """
     Runs simulations multiple times for all inputted values, that are
         meant to modify certain parameter, and should change the results
@@ -193,7 +188,8 @@ def run_multiple_simulations(simulation, parameter, values):
         parameters[parameter] = value
         print("parameter: {}, value: {}".format(parameter, value))
 
-        result = run_simulation(simulation=simulation, parameters=parameters)
+        result = run_simulation(simulation_func=simulation_func,
+                                parameters=parameters)
         results[value] = result
         print(result)
 
@@ -203,7 +199,7 @@ def run_multiple_simulations(simulation, parameter, values):
     return results
 
 
-def aggregate_all_tests(simulation, testing_scenarios,
+def aggregate_all_tests(simulation_func, testing_scenarios,
                         no_of_repetitions=1, description="classic"):
     """
     Running all the testing scenarios specified number of times
@@ -216,7 +212,7 @@ def aggregate_all_tests(simulation, testing_scenarios,
         for scenario in testing_scenarios:
             parameter = scenario["parameter"]
             values = scenario["values"]
-            result = run_multiple_simulations(simulation=simulation,
+            result = run_multiple_simulations(simulation_func=simulation_func,
                                               parameter=parameter,
                                               values=values)
 
