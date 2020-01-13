@@ -31,12 +31,13 @@ def calculate_error(Sim) -> Union[float, str]:
         return "unknown"
 
 
-def simulate_from_gui(parameters_from_gui: dict) -> dict:
+def simulate_from_gui(parameters_from_gui: dict,
+                      progress_callback) -> dict:
     """
     Starts the whole simulation with the inputs from GUI
     """
 
-    return create_and_run_simulation(**parameters_from_gui)
+    return create_and_run_simulation(**parameters_from_gui, progress_callback=progress_callback)
 
 
 def create_and_run_simulation(parameters,
