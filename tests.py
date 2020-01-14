@@ -7,6 +7,7 @@ This unittesting module wants to make sure we accidentally
 import unittest
 import os
 import subprocess
+import sys
 
 import heat_transfer_simulation as classic_sim
 import heat_transfer_simulation_inverse_inheritance as inverse_sim
@@ -115,6 +116,12 @@ class TestMypyAnalysis(unittest.TestCase):
             print("Analysing {}".format(file_name_full))
 
             # Running the mypy analysis through the command line
+            # NOTE: turns out in python3.6 and below the capture_output
+            #   argument is unknown, and therefore it fails here
+            if float(sys.version[:3]) < 3.7:
+                print("These tests cannot be run, as python3.7 or higher is required")
+                continue
+
             result = subprocess.run(["mypy", file_name_full], capture_output=True, text=True)
             print(result.stdout)
 

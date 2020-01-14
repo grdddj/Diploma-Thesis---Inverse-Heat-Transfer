@@ -25,7 +25,8 @@ def simulate_from_gui(parameters_from_gui: dict,
     Starts the whole simulation with the inputs from GUI
     """
 
-    return create_and_run_simulation(**parameters_from_gui, progress_callback=progress_callback)
+    return create_and_run_simulation(progress_callback=progress_callback,
+                                     **parameters_from_gui)
 
 
 def create_and_run_simulation(parameters: dict,
