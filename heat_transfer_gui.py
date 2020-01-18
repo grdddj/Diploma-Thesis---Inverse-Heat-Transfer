@@ -1,67 +1,8 @@
 """
-This module is the current HEAD of the development - almost a
-    complete transition from TKinter GUI to PyQt5/PySide2 GUI.
-    Only some smaller additions are needed here.
-
-Beware that this file relies on heat_transfer_gui.ui, which is generated
-    automatically from Qt Designer - so rather not to be manipulated.
-
-Benefits of moving from TKinter to PyQt involve:
-    1) The Performance:
-        - The new GUI frameworks allow for the easy possibility of multithreading,
-            which is making out application quicker and more responsive than
-            before, without needing to awkwardly switch attention between
-            calculating and listening.
-    2) The functionality:
-        - The new GUI frameworks have richer library of possible widgets and behaviors,
-            which offers more possibilities increases our toolset.
-    3) The UI development:
-        - PyQt5 offers a fantastic app called Qt Designer, which is itself a GUI
-            for creating GUIs. This UI is then completely separated from the
-            business logic, and therefore almost anybody without any programming
-            skills can create it. As long as the names of the widgets remain
-            the same, it is possible to change layout of the UI freely, without
-            having to worry about breaking the code.
-        - It has maybe one disadvantage though, and that it is not possible to
-            place widgets and stuff in relative sizes like in TKinter
-            (At least I haven't found it yet)
-    4) The future:
-        - Qt as a platform for creating GUIs is not used only in Python, but
-            almost in all major languages. Both the knowledge of it, and the
-            possibility of transforming the app into a different language,
-            if necessary, is certainly useful.
-
-TODOS:
-    - create some area where to show error messages to the user
-        - or create a popup window with the same intent
-    - discuss the formats and savings of csv and pgn results
-    - find out how to make the left arguments-menu not occupy the whole height
-    - have an eye on speed - maybe it could even handle some multiprocessing
-        - (or that FeniCS library)
-    - think about the imports
-        - (whether import *, import the module, or import individual functions)
-    - bear in mind that we want to transition to PySide2 at the very end
-    - generalize the fonts
-    - transfer the input+labels to QFormLayout()
-        - https://www.tutorialspoint.com/pyqt/pyqt_qformlayout_class.htm
-    - improve the plotting efficiency
-        - not plotting experiment data each time, just once if possible
-        - just appending the previous graph with newly calculated data
-    - consider creating two subplots of the same plot, to be able to export
-        both plots to the same picture
-
-TODOS FROM Tests.py:
-    - offer the option of regular savings (useful in time-consuming simulations)
-    - discuss in which situations to save the file
-    - discuss the naming of the saved files
-        - what information to incorporate there (dt etc.)
-    - offer the creation of custom material/custom properties
-        - consider showing the properties in the menu/next to it
-        - consider moving materials to the DB (SQLite3)
-    - improve the design of the menus and buttons
-    - offer "run calculation on background" possibility (without any visual output)
-    - parameters that could be inputted from the user:
-        - the plotting period also in "normal" seconds - to show progress periodically
+This module is including all the main functionality of this application
+    and is the one being called.
+It spawns the GUI and enables users to choose their custom parameters
+    and run the simulation.
 """
 
 import sys

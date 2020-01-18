@@ -4,31 +4,9 @@ It can be run separately or from the GUI, in which case
     it will be updating the plot.
 """
 
-from typing import Union
-import numpy as np  # type: ignore
 from NumericalInverse_inheritance import InverseSimulation
 from experiment_data_handler import Material
 from heat_transfer_simulation_utilities import SimulationController
-
-
-def calculate_error(Sim) -> Union[float, str]:
-    """
-    Function that calculates error value for this simulation
-    """
-
-    # TODO: review this, as it might not be correct
-    calculated_heatflux = Sim.HeatFlux
-    experiment_heatflux = np.interp(Sim.t, Sim.Exp_data.t_data, Sim.Exp_data.q_data)
-
-    # Determining the shorter length, to unify the sizes
-    min_length = min(len(calculated_heatflux), len(experiment_heatflux))
-
-    try:
-        error = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
-        return round(error, 3)
-    except ValueError:
-        # This is raised when the lengths of compared lists are not the same (for some reason)
-        return "unknown"
 
 
 def simulate_from_gui(parameters_from_gui: dict,
@@ -66,8 +44,6 @@ def create_and_run_simulation(parameters,
                             tolerance=parameters["tolerance"])
 
     sim_controller = SimulationController(Sim=Sim,
-                                          next_step_func="evaluate_one_inverse_step",
-                                          calculate_error_func=calculate_error,
                                           parameters=parameters,
                                           progress_callback=progress_callback,
                                           temperature_plot=temperature_plot,

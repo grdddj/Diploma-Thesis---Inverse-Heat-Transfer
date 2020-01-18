@@ -7,7 +7,6 @@ It can be easily imported and used for any simulation that
 
 import csv
 import time
-from typing import Callable
 
 
 class Callback:
@@ -88,10 +87,7 @@ class Callback:
                 if self.not_replot_heatflux:
                     self.heat_flux_already_plotted = True
 
-            # If callback is defined, emit positive value to increment time in GUI
-            if self.progress_callback is not None:
-                self.progress_callback.emit(1)
-
+            # Updating the time the callback was last called
             self.last_call += self.call_at
 
         # TODO: decide how often to read the queue (look if it does not affect performance a lot)
@@ -110,9 +106,11 @@ class Callback:
             elif msg == "continue":
                 self.simulation_state = "running"
 
-        # Emit that simulation is not running (not to increment time)
-        if self.simulation_state != "running" and self.progress_callback is not None:
-            self.progress_callback.emit(0)
+        # According to the current state, emit positive or zero
+        #   value to give information to the GUI if we are running or not
+        if self.progress_callback is not None:
+            value_to_emit = 1 if self.simulation_state == "running" else 0
+            self.progress_callback.emit(value_to_emit)
 
         # Returning the current simulation state to be handled by higher function
         return self.simulation_state
@@ -126,8 +124,6 @@ class SimulationController:
     def __init__(self,
                  Sim,
                  parameters: dict,
-                 next_step_func: str,
-                 calculate_error_func: Callable,
                  algorithm: str = "",
                  time_data_location: str = "",
                  quantity_data_location: str = "",
@@ -150,8 +146,6 @@ class SimulationController:
         self.quantity_data_location = quantity_data_location
         self.quantity_and_unit = quantity_and_unit
         self.save_results = save_results
-        self.next_step_func = getattr(self.Sim, next_step_func)
-        self.calculate_error_func = calculate_error_func
         self.error_norm = None
 
     def complete_simulation(self) -> dict:
@@ -159,32 +153,36 @@ class SimulationController:
         Running all the simulation steps, if not stopped
         """
 
-        while self.Sim.current_step_idx < self.Sim.max_step_idx:
+        # Calling the evaluating function as long as the simulation has not finished
+        while not self.Sim.simulation_has_finished:
             # Processing the callback and getting the simulation state at the same time
             # Then acting accordingly to the current state
             simulation_state = self.MyCallBack(self.Sim)
             if simulation_state == "running":
                 # Calling the function that is determining next step
-                self.next_step_func()
+                self.Sim.evaluate_one_step()
             elif simulation_state == "paused":
+                # Sleeping for some little time before checking again, to save CPU
                 time.sleep(0.1)
             elif simulation_state == "stopped":
+                # Breaking out of the loop - finishing simulation
                 print("stopping")
                 break
 
         # Calling callback at the very end, to update the plot with complete results
         self.MyCallBack(self.Sim, force_update=True)
 
-        # Determining the error margin through defined function
-        self.error_norm = self.calculate_error_func(self.Sim)
+        # Determining the error margin through the custom simulation function
+        self.error_norm = self.Sim.calculate_final_error()
         print("Error norm: {}".format(self.error_norm))
 
+        # If wanted to, save the results
         if self.save_results:
-            self.save_results_to_csv_file()
+            self._save_results_to_csv_file()
 
         return {"error_value": self.error_norm}
 
-    def save_results_to_csv_file(self) -> None:
+    def _save_results_to_csv_file(self) -> None:
         """
         Outputs the (semi)results of a simulation into a CSV file and names it
             accordingly.

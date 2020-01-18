@@ -4,19 +4,9 @@ It can be run separately or from the GUI, in which case
     it will be updating the plot.
 """
 
-import numpy as np  # type: ignore
 from NumericalForward import Simulation
 from experiment_data_handler import Material
 from heat_transfer_simulation_utilities import SimulationController
-
-
-def calculate_error(Sim) -> float:
-    """
-    Function that calculates error value for this simulation
-    """
-
-    error = np.sum(abs(Sim.T_x0 - Sim.T_data))/len(Sim.t[1:])
-    return round(error, 3)
 
 
 def simulate_from_gui(parameters_from_gui: dict,
@@ -50,8 +40,6 @@ def create_and_run_simulation(parameters: dict,
                      x0=parameters["place_of_interest"])
 
     sim_controller = SimulationController(Sim=Sim,
-                                          next_step_func="evaluate_one_step",
-                                          calculate_error_func=calculate_error,
                                           parameters=parameters,
                                           progress_callback=progress_callback,
                                           temperature_plot=temperature_plot,
