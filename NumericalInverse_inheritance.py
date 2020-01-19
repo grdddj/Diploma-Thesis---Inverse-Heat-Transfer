@@ -10,6 +10,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
     """
     Class holding variables and methods to allow for the simulation of the
         inverse problem
+    Inherits all the internal properties from the Simulation class
     """
 
     def __init__(self,
@@ -82,30 +83,27 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             self._evaluate_n_steps(n_steps=self.window_span)
             new_error = self._evaluate_window_error_norm()
 
+            # When we are satisfied with the heat flux, finish the loop,
+            #   otherwise continue with adjusting it
             if abs(prev_error - new_error) < self.tolerance:
-                # revert simulation to last checkpoint
+                # revert simulation to last checkpoint and make only one step
                 self._revert_to_checkpoint()
-                # make one step only
                 super().evaluate_one_step()
-                # print(f"Accepting Flux: %.2f at time %.2f s with Error: %.10f after %i iterations" % (self.HeatFlux[self.current_q_idx], self.t[self.current_q_idx], new_error, iter_no))
-                # this Flux seems to be ok so stop adjusting it
+                # print("Accepting Flux: {} at time {} with Error {} after {} iterations".format(
+                #     self.HeatFlux[self.current_q_idx], self.t[self.current_q_idx], new_error, iter_no))
                 break
-            elif new_error < prev_error:
+            else:
+                # When the new error is higher than the previous one, we want
+                #   to start making smaller adjustments in the opposite direction
+                # Otherwise continue with current adjustments
+                if new_error > prev_error:
+                    q_adj *= -0.7
+                # Saving the error and reverting to the last checkpoint
                 prev_error = new_error
-                # revert simulation to last checkpoint
                 self._revert_to_checkpoint()
-                # and keep adjusting the heat flux the by the same value because
-                #   the error is getting smaller
-            elif new_error > prev_error:
-                prev_error = new_error
-                # revert simulation to last checkpoint
-                self._revert_to_checkpoint()
-                # and make adjustments to the heat flux smaller going in the
-                #   opposite direction because the error got higher last time
-                q_adj *= -0.7
-            # adjust heatflux a little in the explicit portion
+
+            # adjust heatflux a little in the explicit and implicit portion
             self.HeatFlux[self.current_q_idx] += q_adj
-            # adjust heatflux a little in the implicit portion
             self.HeatFlux[self.current_q_idx+1] += q_adj
         # since the current flux is adjusted enough tell the Prob to adjust
         #   next one in next SolveInverseStep call
@@ -144,10 +142,10 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             to evaluate more steps at once
         """
 
-        step = 0
-        while self.current_step_idx < self.max_step_idx and step < n_steps:
-            super().evaluate_one_step()
-            step += 1
+        for _ in range(n_steps):
+            # We must only check if we did not exceed the simulation time
+            if not self.simulation_has_finished:
+                super().evaluate_one_step()
 
     def _make_checkpoint(self) -> None:
         """
