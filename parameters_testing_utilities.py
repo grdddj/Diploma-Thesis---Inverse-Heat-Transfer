@@ -181,7 +181,7 @@ def run_multiple_simulations(simulation_func: Callable,
         "rho": 7850,
         "cp": 520,
         "lmbd": 50,
-        "dt": 50,
+        "dt": 3,
         "object_length": 0.01,
         "place_of_interest": 0.0045,
         "number_of_elements": 100,
@@ -189,7 +189,10 @@ def run_multiple_simulations(simulation_func: Callable,
         "robin_alpha": 13.5,
         "theta": 0.5,
         "window_span": 2,
-        "tolerance": 1e-05
+        "tolerance": 1e-05,
+        "q_init": 0,
+        "init_q_adjustment": 20,
+        "adjusting_value": -0.7
     }
 
     # Running the simulation for all the inputted values of the parameter

@@ -6,7 +6,7 @@ This module is testing the impact the change of input parameters
 import numpy as np  # type: ignore
 
 from parameters_testing_utilities import aggregate_all_tests
-from heat_transfer_simulation_inverse_inheritance import create_and_run_simulation
+from heat_transfer_simulation_inverse import create_and_run_simulation
 
 
 def perform_tests():
@@ -14,7 +14,7 @@ def perform_tests():
     Running all the test scenarios defined withing it
     """
 
-    no_of_repetitions = 5
+    no_of_repetitions = 2
     steps = 200
 
     # Defining all the scenarios we want to test
@@ -37,7 +37,7 @@ def perform_tests():
         {
             "parameter": "window_span",
             # "values": np.arange(1, 10, 1)
-            "values": np.arange(1, 10, 4)
+            "values": range(2, 10)
         },
         {
             "parameter": "tolerance",

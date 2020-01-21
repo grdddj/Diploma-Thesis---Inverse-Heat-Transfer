@@ -14,7 +14,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore  # type: ignore
 from PyQt5.uic import loadUiType  # type: ignore
 
 import heat_transfer_simulation
-import heat_transfer_simulation_inverse_inheritance
+import heat_transfer_simulation_inverse
 
 from heat_transfer_workers import Worker
 
@@ -424,7 +424,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                             common_arguments_to_workers)
         elif self.get_current_algorithm() == "inverse":
             print("inverse")
-            worker = Worker(heat_transfer_simulation_inverse_inheritance.simulate_from_gui,
+            worker = Worker(heat_transfer_simulation_inverse.simulate_from_gui,
                             common_arguments_to_workers)
 
         # Opening some additional communication channels with the workers

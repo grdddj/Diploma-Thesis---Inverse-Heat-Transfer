@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt  # type: ignore
 
 # Defining the file with data, and whether to use logarithmic scale on x-axis
 directory_for_results = 'Parameters testing'
-file_name = "1578140846-4rep-inverse.json"
-LOGARITHMIC_X_AXIS = True
+file_name = "1579638817-2rep-inverse.json"
+LOGARITHMIC_X_AXIS = False
 
 
 def get_data(file_name: str) -> dict:

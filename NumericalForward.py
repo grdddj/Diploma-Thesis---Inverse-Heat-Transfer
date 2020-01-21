@@ -5,7 +5,7 @@ from scipy.sparse import csr_matrix, diags  # type: ignore
 #   (it ignores zeros in the matrices)
 from scipy.sparse.linalg import spsolve  # type: ignore
 from experiment_data_handler import ExperimentalData
-from interpolations import PredefinedInterpForFloat, PredefinedInterpForList
+from interpolations import predefined_interp_class_factory
 
 
 class Simulation:  # In later objects abreviated as Sim
@@ -73,13 +73,8 @@ class Simulation:  # In later objects abreviated as Sim
         # Placeholder for temperature probes data
         self.T_x0_checkpoint = len(self.t)*[0.0]
 
-        # This way it does not spend any time on if statements during simulation
-        try:
-            len(self.x0)  # type: ignore
-            self.T_x0_interpolator = PredefinedInterpForList(self.x0, self.x)
-        except TypeError:
-            self.T_x0_interpolator = PredefinedInterpForFloat(self.x0, self.x)  # type: ignore
-        # save initial T_x0
+        # Setup the right interpolation object and save initial T_x0
+        self.T_x0_interpolator = predefined_interp_class_factory(self.x0, self.x)
         self.T_x0[0] = self.T_x0_interpolator(self.T)  # type: ignore
         # TODO: make it allow multiple probes at the same time
 

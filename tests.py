@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 import heat_transfer_simulation as classic_sim
-import heat_transfer_simulation_inverse_inheritance as inverse_sim
+import heat_transfer_simulation_inverse as inverse_sim
 
 
 class TestClassicSimulation(unittest.TestCase):
@@ -55,15 +55,18 @@ class TestInverseSimulation(unittest.TestCase):
             "rho": 7850,
             "cp": 520,
             "lmbd": 50,
-            "dt": 50,
+            "dt": 15,
             "object_length": 0.01,
             "place_of_interest": 0.0045,
             "number_of_elements": 100,
             "callback_period": 500,
             "robin_alpha": 13.5,
             "theta": 0.5,
-            "window_span": 2,
-            "tolerance": 1e-05
+            "window_span": 3,
+            "tolerance": 1e-05,
+            "q_init": 0,
+            "init_q_adjustment": 20,
+            "adjusting_value": -0.7
         }
 
         result = inverse_sim.create_and_run_simulation(parameters)
