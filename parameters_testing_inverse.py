@@ -14,7 +14,7 @@ def perform_tests():
     Running all the test scenarios defined withing it
     """
 
-    no_of_repetitions = 2
+    no_of_repetitions = 3
     steps = 200
 
     # Defining all the scenarios we want to test
@@ -43,6 +43,10 @@ def perform_tests():
             "parameter": "tolerance",
             # "values": np.logspace(-5, -1, num=20, base=10)
             "values": np.logspace(-5, -1, num=3, base=10)
+        },
+        {
+            "parameter": "adjusting_value",
+            "values": np.arange(-0.99, -0.00, 0.02)
         }
     ]
 
