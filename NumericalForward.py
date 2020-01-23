@@ -29,14 +29,12 @@ class Simulation:  # In later objects abreviated as Sim
         self.theta = theta  # fixed integration method
         self.Exp_data = ExperimentalData(experiment_data_path)
 
-        # A lot of properties can be either chosen (in GUI), or defined in a CSV
-        # TODO: let user choose one or another, at least in material
-        self.rho = material.rho if material is not None else self.Exp_data.Mat.rho
-        self.cp = material.cp if material is not None else self.Exp_data.Mat.cp
-        self.lmbd = material.lmbd if material is not None else self.Exp_data.Mat.lmbd
-        self.length = length if length is not None else self.Exp_data.Length
-        self.robin_alpha = robin_alpha if robin_alpha is not None else self.Exp_data.RobinAlpha
-        self.x0 = x0 if x0 is not None else self.Exp_data.x0
+        self.rho = material.rho
+        self.cp = material.cp
+        self.lmbd = material.lmbd
+        self.length = length
+        self.robin_alpha = robin_alpha
+        self.x0 = x0
 
         # Placeholder for the fixed simulation time points
         self.t = np.arange(self.Exp_data.t_data[0], self.Exp_data.t_data[-1] + self.dt, self.dt)

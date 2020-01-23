@@ -5,6 +5,7 @@ It spawns the GUI and enables users to choose their custom parameters
     and run the simulation.
 """
 
+import os
 import sys
 import time
 import threading
@@ -49,6 +50,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         # Filling the left side with user choice and inputs
         self.add_saving_choices(self.verticalLayout_6)
         self.add_algorithm_choice(self.verticalLayout_6)
+        self.add_data_file_choices(self.verticalLayout_6)
         self.add_material_choice(self.verticalLayout_6)
         self.add_user_inputs(self.verticalLayout_6)
 
@@ -85,6 +87,22 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.button_stop_3.pressed.connect(lambda: self.stop_simulation())
 
         self.update_state_for_the_user()
+
+    def open_file_name_dialog(self):
+        """
+        Opens a dialog for the choice of a data file
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self,
+            "Choose a data file", "", "CSV Files (*.csv)", options=options)
+        if file_path:
+            file_name = os.path.basename(file_path)
+            print(file_name)
+
+            # Displaying this into the input to provide visible feedback
+            self.data_file_input.setText(file_name)
 
     def set_simulation_state(self,
                              new_state: str,
@@ -177,6 +195,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
         self.add_saving_choices(self.verticalLayout_6)
         self.add_algorithm_choice(self.verticalLayout_6, self.get_current_algorithm())
+        self.add_data_file_choices(self.verticalLayout_6)
         self.add_material_choice(self.verticalLayout_6)
         self.add_user_inputs(self.verticalLayout_6)
 
@@ -192,6 +211,30 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
         new_layout.addWidget(self.save_plots_checkbox)
         new_layout.addWidget(self.save_data_checkbox)
+
+        parent_layout.addLayout(new_layout)
+
+    def add_data_file_choices(self, parent_layout) -> None:
+        """
+        Including the checkboxes for user to choose if to save data or not
+        """
+
+        new_layout = QtWidgets.QHBoxLayout()
+
+        label = QtWidgets.QLabel("Data file: ")
+        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+
+        self.data_file_input = QtWidgets.QLineEdit()
+        self.data_file_input.setText("DATA.csv")
+        self.data_file_input.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        self.data_file_input.setReadOnly(True)
+
+        choice_button = QtWidgets.QPushButton('Choose', self)
+        choice_button.clicked.connect(self.open_file_name_dialog)
+
+        new_layout.addWidget(label)
+        new_layout.addWidget(self.data_file_input)
+        new_layout.addWidget(choice_button)
 
         parent_layout.addLayout(new_layout)
 
@@ -395,6 +438,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         parameters["rho"] = current_material_properties["rho"]
         parameters["cp"] = current_material_properties["cp"]
         parameters["lmbd"] = current_material_properties["lmbd"]
+        parameters["experiment_data_path"] = self.data_file_input.text()
 
         # Disabling the user from modifying inputs
         self.lock_inputs_for_editing(True)

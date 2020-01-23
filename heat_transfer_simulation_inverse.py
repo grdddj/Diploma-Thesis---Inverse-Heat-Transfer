@@ -42,7 +42,8 @@ def create_and_run_simulation(parameters,
                             q_init=parameters["q_init"],
                             init_q_adjustment=parameters["init_q_adjustment"],
                             adjusting_value=parameters["adjusting_value"],
-                            tolerance=parameters["tolerance"])
+                            tolerance=parameters["tolerance"],
+                            experiment_data_path=parameters["experiment_data_path"])
 
     sim_controller = SimulationController(Sim=Sim,
                                           parameters=parameters,
@@ -76,7 +77,8 @@ if __name__ == '__main__':
         "tolerance": 1e-05,
         "q_init": 0,
         "init_q_adjustment": 20,
-        "adjusting_value": -0.7
+        "adjusting_value": -0.7,
+        "experiment_data_path": "DATA.csv"
     }
 
     create_and_run_simulation(parameters)

@@ -32,7 +32,8 @@ class TestClassicSimulation(unittest.TestCase):
             "number_of_elements": 100,
             "callback_period": 500,
             "robin_alpha": 13.5,
-            "theta": 0.5
+            "theta": 0.5,
+            "experiment_data_path": "DATA.csv"
         }
 
         result = classic_sim.create_and_run_simulation(parameters)
@@ -66,7 +67,8 @@ class TestInverseSimulation(unittest.TestCase):
             "tolerance": 1e-05,
             "q_init": 0,
             "init_q_adjustment": 20,
-            "adjusting_value": -0.7
+            "adjusting_value": -0.7,
+            "experiment_data_path": "DATA.csv"
         }
 
         result = inverse_sim.create_and_run_simulation(parameters)

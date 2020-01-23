@@ -192,7 +192,8 @@ def run_multiple_simulations(simulation_func: Callable,
         "tolerance": 1e-05,
         "q_init": 0,
         "init_q_adjustment": 20,
-        "adjusting_value": -0.7
+        "adjusting_value": -0.7,
+        "experiment_data_path": "DATA.csv"
     }
 
     # Running the simulation for all the inputted values of the parameter

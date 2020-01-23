@@ -37,7 +37,8 @@ def create_and_run_simulation(parameters: dict,
                      theta=parameters["theta"],
                      robin_alpha=parameters["robin_alpha"],
                      dt=parameters["dt"],
-                     x0=parameters["place_of_interest"])
+                     x0=parameters["place_of_interest"],
+                     experiment_data_path=parameters["experiment_data_path"])
 
     sim_controller = SimulationController(Sim=Sim,
                                           parameters=parameters,
@@ -67,7 +68,8 @@ if __name__ == '__main__':
         "number_of_elements": 100,
         "callback_period": 500,
         "robin_alpha": 13.5,
-        "theta": 0.5
+        "theta": 0.5,
+        "experiment_data_path": "DATA.csv"
     }
 
     create_and_run_simulation(parameters)

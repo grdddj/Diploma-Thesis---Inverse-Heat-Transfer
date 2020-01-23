@@ -26,11 +26,11 @@ def _save_data(t_data, q_data, T_amb_data: list, file_name: str):
 
     with open(file_name, "w") as csv_file:
         csv_writer = writer(csv_file)
-        headers = ["Time", "HeatFlux", "T_amb"]
+        headers = ["Time", "HeatFlux", "T_amb", "Temperature"]
         csv_writer.writerow(headers)
 
         for index in range(np.size(q_data)):
-            row = [t_data[index], q_data[index], T_amb_data[index]]
+            row = [t_data[index], q_data[index], T_amb_data[index], T_amb_data[index]]
             csv_writer.writerow(row)
 
 
@@ -72,5 +72,36 @@ def sinus_data():
     plt.show()
 
 
+def square_data():
+    """
+    Creating a defined square wave
+    """
+
+    no_elements = 666
+    low_value = 0
+    high_value = 200
+    cycles = 4
+    file_name = "square_data.csv"
+
+    # Calculating the length of each segment, and then real number of elements
+    length = no_elements // (2*cycles+1)
+    real_elements = length * (2*cycles+1)
+
+    t_data = np.arange(0, real_elements, 1)
+    q_data = np.empty(real_elements)
+
+    # Assigning low or high value in particular intervals
+    for i in range(2*cycles+1):
+        q_data[length*i:length*(i+1)] = high_value if i % 2 == 0 else low_value
+
+    T_amb_data = _T_amb_rand_data(no_elements, 21, 0.05)
+
+    _save_data(t_data, q_data, T_amb_data, file_name)
+
+    plt.plot(t_data, q_data)
+    plt.show()
+
+
 if __name__ == "__main__":
     sinus_data()
+    square_data()
