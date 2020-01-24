@@ -2,7 +2,8 @@
 This module is hosting class responsible for the inverse simulation
 """
 
-import numpy as np    # type: ignore
+import numpy as np  # type: ignore
+from scipy.signal import savgol_filter  # type: ignore
 from NumericalForward import Simulation
 
 
@@ -38,6 +39,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         self.tolerance = tolerance
         self.init_q_adjustment = init_q_adjustment
         self.adjusting_value = adjusting_value
+
+        # Storing the amount of iterations we make for the simulation
+        self.number_of_iterations = 0
 
         # fluxes to be resolved
         self.current_q_idx = 0  # initial index
@@ -93,6 +97,8 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                 super().evaluate_one_step()
                 # print("Accepting Flux: {} at time {} with Error {} after {} iterations".format(
                 #     self.HeatFlux[self.current_q_idx], self.t[self.current_q_idx], new_error, iter_no))
+
+                self.number_of_iterations += iter_no
                 break
             else:
                 # When the new error is higher than the previous one, we want
@@ -125,6 +131,31 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
 
         error = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
         return round(error, 3)
+
+    def smooth_the_result(self) -> None:
+        """
+        Making the final result smoothed - modifying the resulting HeatFlux
+
+        Using Savgol filter, that is getting rid of extremes
+        http://scipy.github.io/devdocs/generated/scipy.signal.savgol_filter.html
+        OR
+        Moving average method
+        https://stackoverflow.com/questions/20618804/how-to-smooth-a-curve-in-the-right-way#answer-26337730
+        """
+
+        # Choosing which method to use
+        method = "savgol"
+
+        if method == "savgol":
+            window_length = self.HeatFlux.size // 20
+            # Window window_length must be odd
+            if window_length % 2 == 0:
+                window_length += 1
+            self.HeatFlux = savgol_filter(self.HeatFlux, window_length, 2)
+        else:
+            window_length = self.HeatFlux.size // 50
+            box = np.ones(window_length)/window_length
+            self.HeatFlux = np.convolve(self.HeatFlux, box, mode='same')
 
     def _evaluate_window_error_norm(self) -> float:
         """

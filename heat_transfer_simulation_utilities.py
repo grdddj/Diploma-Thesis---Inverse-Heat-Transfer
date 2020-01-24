@@ -174,7 +174,23 @@ class SimulationController:
 
         # Determining the error margin through the custom simulation function
         self.error_norm = self.Sim.calculate_final_error()
-        print("Error norm: {}".format(self.error_norm))
+        print("Error norm before smoothing: {}".format(self.error_norm))
+
+        # Performing the data smoothing when the simulation supports it
+        if hasattr(self.Sim, "smooth_the_result"):
+            self.Sim.smooth_the_result()
+            # Calling callback after smoothing
+            self.MyCallBack(self.Sim, force_update=True)
+
+            # Calculating the error margin after smoothing
+            self.error_norm = self.Sim.calculate_final_error()
+            print("Error norm after smoothing: {}".format(self.error_norm))
+
+        # In case of inverse problem show the iteratoin statistics
+        if hasattr(self.Sim, "number_of_iterations"):
+            print("self.current_step_idx", self.Sim.current_step_idx)
+            print("self.number_of_iterations", self.Sim.number_of_iterations)
+            print("division", self.Sim.number_of_iterations / self.Sim.current_step_idx)
 
         # If wanted to, save the results
         if self.save_results:
