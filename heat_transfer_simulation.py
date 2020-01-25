@@ -46,8 +46,7 @@ def create_and_run_simulation(parameters: dict,
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
                                           queue=queue,
-                                          save_results=save_results,
-                                          not_replot_heatflux=True)
+                                          save_results=save_results)
 
     result = sim_controller.complete_simulation()
     return result

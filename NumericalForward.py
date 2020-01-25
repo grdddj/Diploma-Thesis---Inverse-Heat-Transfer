@@ -61,6 +61,8 @@ class Simulation:  # In later objects abreviated as Sim
         self.x = np.linspace(0, self.length, N+1)
         # error_value of the simulation
         self.error_norm = 0.0
+        # Whether we have plotted the heat flux, which should be done only once
+        self.heat_flux_already_plotted = False
 
         # temperature fields
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.empty.html
@@ -168,9 +170,12 @@ class Simulation:  # In later objects abreviated as Sim
         #     InverseSimulation()
         self.current_t = self.dt * self.current_step_idx
 
-    def after_simulation_action(self):
+    def after_simulation_action(self, SimController=None):
         """
         Defines what should happen after the simulation is over
+
+        Has access to all the variables from SimController, so can
+            freely communicate with the GUI
         """
 
         # Assigning the error value
@@ -196,6 +201,25 @@ class Simulation:  # In later objects abreviated as Sim
 
             for time_value, temp_value in zip(time_data, temp_data):
                 csv_writer.writerow([time_value, temp_value])
+
+    def plot(self, temperature_plot, heat_flux_plot):
+        """
+        Defining the way simulation data should be plotted
+        """
+
+        # Displaying only the data that is calculated ([:self.current_step_idx])
+        temperature_plot.plot(x_values=self.t[:self.current_step_idx],
+                              y_values=self.T_x0[:self.current_step_idx],
+                              x_experiment_values=self.Exp_data.t_data,
+                              y_experiment_values=self.Exp_data.T_data)
+
+        # Plotting the heat flux only once, because it is not changing
+        if not self.heat_flux_already_plotted:
+            heat_flux_plot.plot(x_values=None,
+                                y_values=None,
+                                x_experiment_values=self.Exp_data.t_data,
+                                y_experiment_values=self.Exp_data.q_data)
+            self.heat_flux_already_plotted = True
 
     def _calculate_final_error(self) -> float:
         """

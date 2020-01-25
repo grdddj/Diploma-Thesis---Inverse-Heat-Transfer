@@ -5,7 +5,6 @@ It can be easily imported and used for any simulation that
     complete_simulation(), Sim object etc.)
 """
 
-import csv
 import time
 
 
@@ -13,6 +12,8 @@ class Callback:
     """
     Class defining the actions that should happen when the simulation
         should share the results with the outside world
+    It is also a communication channel between outside world and simulation,
+        as it is listening for commands on a shared queue object
     """
 
     def __init__(self,
@@ -20,8 +21,7 @@ class Callback:
                  heat_flux_plot=None,
                  temperature_plot=None,
                  queue=None,
-                 progress_callback=None,
-                 not_replot_heatflux: bool = False) -> None:
+                 progress_callback=None) -> None:
         self.call_at = call_at  # how often to be called
         self.last_call = 0.0  # time in which the callback was last called
 
@@ -32,11 +32,6 @@ class Callback:
         self.heat_flux_plot = heat_flux_plot
         self.queue = queue
         self.progress_callback = progress_callback
-
-        # Soemtimes do not want to waste time by plotting the same heat_flux values
-        #   over and over, so we do that only once, and flag it to be done
-        self.not_replot_heatflux = not_replot_heatflux
-        self.heat_flux_already_plotted = False
 
         # Setting the starting simulation state as "running" - this can be
         #   changed only through the queue by input from GUI
@@ -55,7 +50,6 @@ class Callback:
             self.heat_flux_plot: {self.heat_flux_plot},
             self.queue: {self.queue},
             self.progress_callback: {self.progress_callback},
-            self.not_replot_heatflux: {self.not_replot_heatflux},
             """
 
     def __call__(self,
@@ -65,40 +59,21 @@ class Callback:
         Defining what should happend when the callback will be called
         """
 
-        # Update the time calculation is in progress
-        # if it is time to comunicate with GUI then show something
+        # Doing something when it is time to comunicate with GUI
         if Sim.current_t > self.last_call + self.call_at or force_update:
-            if self.temperature_plot is not None:
-                # Sending only the data that is already calculated
-                self.temperature_plot.plot(x_values=Sim.t[:Sim.current_step_idx],
-                                           y_values=Sim.T_x0[:Sim.current_step_idx],
-                                           x_experiment_values=Sim.Exp_data.t_data,
-                                           y_experiment_values=Sim.Exp_data.T_data)
-
-            # Plotting the heat flux graph
-            # When specified, marking it as done and not replotting it again
-            if not self.heat_flux_already_plotted and self.heat_flux_plot is not None:
-                x_values = None if self.not_replot_heatflux else Sim.t[:Sim.current_step_idx]
-                y_values = None if self.not_replot_heatflux else Sim.HeatFlux[:Sim.current_step_idx]
-                self.heat_flux_plot.plot(x_values=x_values,
-                                         y_values=y_values,
-                                         x_experiment_values=Sim.Exp_data.t_data,
-                                         y_experiment_values=Sim.Exp_data.q_data)
-                if self.not_replot_heatflux:
-                    self.heat_flux_already_plotted = True
+            # When both the plots are defined, update them
+            if self.temperature_plot is not None and self.heat_flux_plot is not None:
+                Sim.plot(temperature_plot=self.temperature_plot,
+                         heat_flux_plot=self.heat_flux_plot)
 
             # Updating the time the callback was last called
             self.last_call += self.call_at
 
-        # TODO: decide how often to read the queue (look if it does not affect performance a lot)
-        # TODO: make sure there is not more than 1 message in queue (no leftovers)
+        # Getting the connection with GUI and listening for commands
         if self.queue is not None and not self.queue.empty():
-            # Try to get last item from the queue sent from GUI
+            # Getting and parsing the message from shared queue
+            # Changing simulation state according that message
             msg = self.queue.get_nowait()
-            print(msg)
-
-            # This may seem redundant, but we are guarding against some
-            #   unkown msg
             if msg == "stop":
                 self.simulation_state = "stopped"
             elif msg == "pause":
@@ -128,17 +103,18 @@ class SimulationController:
                  queue=None,
                  temperature_plot=None,
                  heat_flux_plot=None,
-                 not_replot_heatflux: bool = False,
                  save_results: bool = False):
         self.Sim = Sim
         self.MyCallBack = Callback(progress_callback=progress_callback,
                                    call_at=parameters["callback_period"],
                                    temperature_plot=temperature_plot,
                                    heat_flux_plot=heat_flux_plot,
-                                   queue=queue,
-                                   not_replot_heatflux=not_replot_heatflux)
+                                   queue=queue)
         self.save_results = save_results
-        self.error_norm = None
+        self.progress_callback = progress_callback
+        self.temperature_plot = temperature_plot
+        self.heat_flux_plot = heat_flux_plot
+        self.queue = queue
 
     def complete_simulation(self) -> dict:
         """
@@ -161,11 +137,13 @@ class SimulationController:
                 print("stopping")
                 break
 
-        # Invoking whatever action should happen after simulation finishes
-        self.Sim.after_simulation_action()
-
         # Calling callback at the very end, to update the plot with complete results
         self.MyCallBack(self.Sim, force_update=True)
+
+        # Invoking whatever action should happen after simulation finishes
+        # Passing whole self object, so Simulation has access to all
+        #   connections here and can communicate with GUI
+        self.Sim.after_simulation_action(self)
 
         # If wanted to, save the results by a custom function
         if self.save_results:

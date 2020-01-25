@@ -204,22 +204,22 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         Including the checkboxes for user to choose if to save data or not
         """
 
-        new_layout = QtWidgets.QHBoxLayout()
+        self.saving_choice_layout = QtWidgets.QHBoxLayout()
 
         self.save_plots_checkbox = QtWidgets.QCheckBox("Save plots")
         self.save_data_checkbox = QtWidgets.QCheckBox("Save data")
 
-        new_layout.addWidget(self.save_plots_checkbox)
-        new_layout.addWidget(self.save_data_checkbox)
+        self.saving_choice_layout.addWidget(self.save_plots_checkbox)
+        self.saving_choice_layout.addWidget(self.save_data_checkbox)
 
-        parent_layout.addLayout(new_layout)
+        parent_layout.addLayout(self.saving_choice_layout)
 
     def add_data_file_choices(self, parent_layout) -> None:
         """
         Including the checkboxes for user to choose if to save data or not
         """
 
-        new_layout = QtWidgets.QHBoxLayout()
+        self.file_choice_layout = QtWidgets.QHBoxLayout()
 
         label = QtWidgets.QLabel("Data file: ")
         label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
@@ -232,11 +232,65 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         choice_button = QtWidgets.QPushButton('Choose', self)
         choice_button.clicked.connect(self.open_file_name_dialog)
 
-        new_layout.addWidget(label)
-        new_layout.addWidget(self.data_file_input)
-        new_layout.addWidget(choice_button)
+        self.file_choice_layout.addWidget(label)
+        self.file_choice_layout.addWidget(self.data_file_input)
+        self.file_choice_layout.addWidget(choice_button)
 
-        parent_layout.addLayout(new_layout)
+        parent_layout.addLayout(self.file_choice_layout)
+
+    def add_smoothing_options(self, parent_layout) -> None:
+        """
+        Including the options for smoothing the final result
+        """
+
+        self.smooth_layout_labels = QtWidgets.QHBoxLayout()
+        self.smooth_layout_buttons = QtWidgets.QHBoxLayout()
+
+        label = QtWidgets.QLabel("Window length: ")
+        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+
+        self.window_length_input = QtWidgets.QLineEdit()
+        self.window_length_input.setText("2")
+        self.window_length_input.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+
+        smooth_btn = QtWidgets.QPushButton('Smooth', self)
+        smooth_btn.clicked.connect(lambda: self.send_smoothing_option("smooth"))
+
+        back_btn = QtWidgets.QPushButton('Back', self)
+        back_btn.clicked.connect(lambda: self.send_smoothing_option("back"))
+
+        finish_btn = QtWidgets.QPushButton('Finish', self)
+        finish_btn.clicked.connect(lambda: self.send_smoothing_option("finish"))
+
+        self.smooth_layout_labels.addWidget(label)
+        self.smooth_layout_labels.addWidget(self.window_length_input)
+        self.smooth_layout_buttons.addWidget(smooth_btn)
+        self.smooth_layout_buttons.addWidget(back_btn)
+        self.smooth_layout_buttons.addWidget(finish_btn)
+
+        parent_layout.addLayout(self.smooth_layout_buttons)
+        parent_layout.addLayout(self.smooth_layout_labels)
+
+    def send_smoothing_option(self, option: str):
+        """
+        Moderating the connection between this GUI thread and calculation thread
+            according the smoothing options after simulation finishes
+        """
+
+        if option == "finish":
+            # Sends the signal the smoothing has finished
+            print("smoothing finished")
+            self.queue.put("stop")
+            # Hide the smoothing options
+            self.clear_layout(self.smooth_layout_labels)
+            self.clear_layout(self.smooth_layout_buttons)
+        elif option == "back":
+            self.queue.put("back")
+        elif option == "smooth":
+            command = "smooth_{}".format(self.window_length_input.text())
+            # option = self.window_length_input.text()
+            print("command", command)
+            self.queue.put(command)
 
     def add_algorithm_choice(self,
                              parent_layout,
@@ -245,7 +299,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         Including the radio buttons for user to choose the algorithm
         """
 
-        new_layout = QtWidgets.QHBoxLayout()
+        self.algorithmlayout = QtWidgets.QHBoxLayout()
 
         label = QtWidgets.QLabel("Algorithm choice:")
         label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
@@ -263,11 +317,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         # TODO: with more than 2 algorithms all would need to listen
         self.radio_choice_classic.toggled.connect(lambda: self.change_user_input())
 
-        new_layout.addWidget(label)
-        new_layout.addWidget(self.radio_choice_classic)
-        new_layout.addWidget(self.radio_choice_inverse)
+        self.algorithmlayout.addWidget(label)
+        self.algorithmlayout.addWidget(self.radio_choice_classic)
+        self.algorithmlayout.addWidget(self.radio_choice_inverse)
 
-        parent_layout.addLayout(new_layout)
+        parent_layout.addLayout(self.algorithmlayout)
 
     def add_user_inputs(self, parent_layout) -> None:
         """
@@ -506,6 +560,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
                 elapsed_time = now - self.simulation_started_timestamp - self.time_spent_paused
                 self.update_time_label(elapsed_time)
+        elif simulation_state == 2:
+            # Handle the smoothing options after simulation has finished
+            self.add_smoothing_options(self.verticalLayout_6)
 
     def update_time_label(self, time_value: float) -> None:
         """

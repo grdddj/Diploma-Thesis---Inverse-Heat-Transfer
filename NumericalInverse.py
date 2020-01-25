@@ -49,6 +49,11 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         self.current_q_idx = 0  # initial index
         self.HeatFlux.fill(q_init)  # change initial values
 
+        # Varibles for smoothing purposes - long list for storing whole
+        #   history and stored index
+        self.smooth_history = [[] for _ in range(1000)]  # type: ignore
+        self.smooth_index = 0
+
     def __repr__(self) -> str:
         """
         Defining what should be displayed when we print the
@@ -119,41 +124,28 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         #   next one in next SolveInverseStep call
         self.current_q_idx += 1
 
-    def calculate_final_error(self) -> float:
-        """
-        Determining error value for this simulation at its end
-        """
-
-        # TODO: review this, as it might not be correct
-        calculated_heatflux = self.HeatFlux
-        experiment_heatflux = np.interp(self.t, self.Exp_data.t_data, self.Exp_data.q_data)
-
-        # Determining the shorter length, to unify the sizes
-        min_length = min(len(calculated_heatflux), len(experiment_heatflux))
-
-        error = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
-        return round(error, 3)
-
-    def after_simulation_action(self):
+    def after_simulation_action(self, SimController=None):
         """
         Defines what should happen after the simulation is over
+
+        Has access to all the variables from SimController, so can
+            freely communicate with the GUI
         """
 
         # Determining the error margin before smoothing
-        self.error_norm = self.calculate_final_error()
+        self.error_norm = self._calculate_final_error()
         print("Error norm before smoothing: {}".format(self.error_norm))
 
-        # Performing the data smoothing
-        self._smooth_the_result()
+        self._perform_smoothing(SimController)
 
-        # Calculating the error margin after smoothing
-        self.error_norm = self.calculate_final_error()
+        # Determining the error margin after smoothing
+        self.error_norm = self._calculate_final_error()
         print("Error norm after smoothing: {}".format(self.error_norm))
 
         # Show the iteration statistics
         print("amount of steps: ", self.current_step_idx)
         print("number_of_iterations", self.number_of_iterations)
-        print("average number of iterations", self.number_of_iterations / self.current_step_idx)
+        print("average of iterations", self.number_of_iterations / self.current_step_idx)
 
     def save_results(self) -> None:
         """
@@ -175,7 +167,89 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             for time_value, temp_value in zip(time_data, temp_data):
                 csv_writer.writerow([time_value, temp_value])
 
-    def _smooth_the_result(self) -> None:
+    def plot(self, temperature_plot, heat_flux_plot):
+        """
+        Defining the way simulation data should be plotted
+        """
+
+        # Displaying only the data that is calculated ([:self.current_step_idx])
+        temperature_plot.plot(x_values=self.t[:self.current_step_idx],
+                              y_values=self.T_x0[:self.current_step_idx],
+                              x_experiment_values=self.Exp_data.t_data,
+                              y_experiment_values=self.Exp_data.T_data)
+
+        heat_flux_plot.plot(x_values=self.t[:self.current_step_idx],
+                            y_values=self.HeatFlux[:self.current_step_idx],
+                            x_experiment_values=self.Exp_data.t_data,
+                            y_experiment_values=self.Exp_data.q_data)
+
+    def _calculate_final_error(self) -> float:
+        """
+        Determining error value for this simulation at its end
+        """
+
+        # TODO: review this, as it might not be correct
+        calculated_heatflux = self.HeatFlux
+        experiment_heatflux = np.interp(self.t, self.Exp_data.t_data, self.Exp_data.q_data)
+
+        # Determining the shorter length, to unify the sizes
+        min_length = min(len(calculated_heatflux), len(experiment_heatflux))
+
+        error = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
+        return round(error, 3)
+
+    def _perform_smoothing(self, SimController=None):
+        """
+        Is responsible for smoothing the result according to user input
+            from the GUI through the shared queue
+        """
+
+        if SimController.progress_callback is not None:
+            # Sending signal that we are ready for smoothing
+            SimController.progress_callback.emit(2)
+            # Listening for the smoothing input
+            while True:
+                if not SimController.queue.empty():
+                    # Try to get last item from the queue sent from GUI,
+                    #   which should contain commands for the smoothing
+                    msg = SimController.queue.get_nowait()
+                    if msg == "stop":
+                        # Finishing the smoothing
+                        break
+                    if msg == "back":
+                        # Reverting the smoothing
+                        self._revert_the_smoothing()
+                    elif msg.startswith("smooth_"):
+                        # Performing the defined smoothing
+                        # Parsing the window length from the message
+                        try:
+                            length = int(msg[len("smooth_"):])
+                        except ValueError:
+                            # Length of 1 will not do anything
+                            print("unparseable window length:", length)
+                            length = 1
+                        self._smooth_the_result(window_length=length)
+
+                    # Updating the plot after smoothing or reverting
+                    self.plot(temperature_plot=SimController.temperature_plot,
+                              heat_flux_plot=SimController.heat_flux_plot)
+                else:
+                    time.sleep(0.1)
+
+    def _revert_the_smoothing(self):
+        """
+        Reverts the heat flux to previous value before last smoothing
+        """
+
+        if self.smooth_index > 0:
+            # Renewing the heat flux value from the previous index
+            #   and decreasing the index we are at
+            self.HeatFlux = self.smooth_history[self.smooth_index-1][:]
+            self.smooth_index -= 1
+        else:
+            print("cannot revert anymore")
+
+    def _smooth_the_result(self, window_length: int = None) -> None:
         """
         Making the final result smoothed - modifying the resulting HeatFlux
 
@@ -190,16 +264,26 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         # The moving average seems to yield better results
         method = "moving_avg"
 
+        # Saving the current flux to be able to revert to it later
+        current_flux = self.HeatFlux[:]
+        self.smooth_history[self.smooth_index] = current_flux
+
+        # Performing the chosen smoothing
         if method == "savgol":
-            window_length = self.HeatFlux.size // 20
-            # Window window_length must be odd
-            if window_length % 2 == 0:
-                window_length += 1
+            if window_length is None:
+                window_length = self.HeatFlux.size // 20
+                # Window window_length must be odd
+                if window_length % 2 == 0:
+                    window_length += 1
             self.HeatFlux = savgol_filter(self.HeatFlux, window_length, 2)
         elif method == "moving_avg":
-            window_length = self.HeatFlux.size // 50
+            if window_length is None:
+                window_length = self.HeatFlux.size // 50
             box = np.ones(window_length)/window_length
             self.HeatFlux = np.convolve(self.HeatFlux, box, mode='same')
+
+        # Increasing the smoothing index for the future
+        self.smooth_index += 1
 
     def _evaluate_window_error_norm(self) -> float:
         """
