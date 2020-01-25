@@ -124,10 +124,6 @@ class SimulationController:
     def __init__(self,
                  Sim,
                  parameters: dict,
-                 algorithm: str = "",
-                 time_data_location: str = "",
-                 quantity_data_location: str = "",
-                 quantity_and_unit: str = "",
                  progress_callback=None,
                  queue=None,
                  temperature_plot=None,
@@ -141,10 +137,6 @@ class SimulationController:
                                    heat_flux_plot=heat_flux_plot,
                                    queue=queue,
                                    not_replot_heatflux=not_replot_heatflux)
-        self.algorithm = algorithm
-        self.time_data_location = time_data_location
-        self.quantity_data_location = quantity_data_location
-        self.quantity_and_unit = quantity_and_unit
         self.save_results = save_results
         self.error_norm = None
 
@@ -169,53 +161,14 @@ class SimulationController:
                 print("stopping")
                 break
 
+        # Invoking whatever action should happen after simulation finishes
+        self.Sim.after_simulation_action()
+
         # Calling callback at the very end, to update the plot with complete results
         self.MyCallBack(self.Sim, force_update=True)
 
-        # Determining the error margin through the custom simulation function
-        self.error_norm = self.Sim.calculate_final_error()
-        print("Error norm before smoothing: {}".format(self.error_norm))
-
-        # Performing the data smoothing when the simulation supports it
-        if hasattr(self.Sim, "smooth_the_result"):
-            self.Sim.smooth_the_result()
-            # Calling callback after smoothing
-            self.MyCallBack(self.Sim, force_update=True)
-
-            # Calculating the error margin after smoothing
-            self.error_norm = self.Sim.calculate_final_error()
-            print("Error norm after smoothing: {}".format(self.error_norm))
-
-        # In case of inverse problem show the iteratoin statistics
-        if hasattr(self.Sim, "number_of_iterations"):
-            print("self.current_step_idx", self.Sim.current_step_idx)
-            print("self.number_of_iterations", self.Sim.number_of_iterations)
-            print("division", self.Sim.number_of_iterations / self.Sim.current_step_idx)
-
-        # If wanted to, save the results
+        # If wanted to, save the results by a custom function
         if self.save_results:
-            self._save_results_to_csv_file()
+            self.Sim.save_results()
 
-        return {"error_value": self.error_norm}
-
-    def _save_results_to_csv_file(self) -> None:
-        """
-        Outputs the (semi)results of a simulation into a CSV file and names it
-            accordingly.
-        """
-
-        # TODO: discuss the possible filename structure
-        file_name = "{}-{}.csv".format(self.algorithm,
-                                       int(time.time()))
-
-        sim_object = getattr(self, "Sim")
-        time_data = getattr(sim_object, self.time_data_location)
-        quantity_data = getattr(sim_object, self.quantity_data_location)
-
-        with open(file_name, "w") as csv_file:
-            csv_writer = csv.writer(csv_file)
-            headers = ["Time [s]", self.quantity_and_unit]
-            csv_writer.writerow(headers)
-
-            for time_value, quantity_value in zip(time_data, quantity_data):
-                csv_writer.writerow([time_value, quantity_value])
+        return {"error_value": self.Sim.error_norm}

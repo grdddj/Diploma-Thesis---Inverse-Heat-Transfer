@@ -2,6 +2,8 @@
 This module is hosting class responsible for the inverse simulation
 """
 
+import csv
+import time
 import numpy as np  # type: ignore
 from scipy.signal import savgol_filter  # type: ignore
 from NumericalForward import Simulation
@@ -132,7 +134,48 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         error = np.sum(abs(calculated_heatflux[:min_length] - experiment_heatflux[:min_length]))/min_length
         return round(error, 3)
 
-    def smooth_the_result(self) -> None:
+    def after_simulation_action(self):
+        """
+        Defines what should happen after the simulation is over
+        """
+
+        # Determining the error margin before smoothing
+        self.error_norm = self.calculate_final_error()
+        print("Error norm before smoothing: {}".format(self.error_norm))
+
+        # Performing the data smoothing
+        self._smooth_the_result()
+
+        # Calculating the error margin after smoothing
+        self.error_norm = self.calculate_final_error()
+        print("Error norm after smoothing: {}".format(self.error_norm))
+
+        # Show the iteration statistics
+        print("amount of steps: ", self.current_step_idx)
+        print("number_of_iterations", self.number_of_iterations)
+        print("average number of iterations", self.number_of_iterations / self.current_step_idx)
+
+    def save_results(self) -> None:
+        """
+        Outputs the (semi)results of a simulation into a CSV file and names it
+            accordingly.
+        """
+
+        # TODO: discuss the possible filename structure
+        file_name = "Inverse-{}.csv".format(int(time.time()))
+
+        time_data = self.t
+        temp_data = self.HeatFlux
+
+        with open(file_name, "w") as csv_file:
+            csv_writer = csv.writer(csv_file)
+            headers = ["Time [s]", "Heat flux [W]"]
+            csv_writer.writerow(headers)
+
+            for time_value, temp_value in zip(time_data, temp_data):
+                csv_writer.writerow([time_value, temp_value])
+
+    def _smooth_the_result(self) -> None:
         """
         Making the final result smoothed - modifying the resulting HeatFlux
 
@@ -143,8 +186,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         https://stackoverflow.com/questions/20618804/how-to-smooth-a-curve-in-the-right-way#answer-26337730
         """
 
-        # Choosing which method to use
-        method = "savgol"
+        # Choosing which method to use (manually so far)
+        # The moving average seems to yield better results
+        method = "moving_avg"
 
         if method == "savgol":
             window_length = self.HeatFlux.size // 20
@@ -152,7 +196,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             if window_length % 2 == 0:
                 window_length += 1
             self.HeatFlux = savgol_filter(self.HeatFlux, window_length, 2)
-        else:
+        elif method == "moving_avg":
             window_length = self.HeatFlux.size // 50
             box = np.ones(window_length)/window_length
             self.HeatFlux = np.convolve(self.HeatFlux, box, mode='same')

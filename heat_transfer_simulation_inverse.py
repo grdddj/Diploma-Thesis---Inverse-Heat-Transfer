@@ -51,10 +51,6 @@ def create_and_run_simulation(parameters,
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
                                           queue=queue,
-                                          algorithm="Inverse",
-                                          time_data_location="t",
-                                          quantity_data_location="HeatFlux",
-                                          quantity_and_unit="Heat flux [W]",
                                           save_results=save_results)
 
     result = sim_controller.complete_simulation()

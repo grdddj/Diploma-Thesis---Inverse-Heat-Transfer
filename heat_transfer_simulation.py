@@ -46,10 +46,6 @@ def create_and_run_simulation(parameters: dict,
                                           temperature_plot=temperature_plot,
                                           heat_flux_plot=heat_flux_plot,
                                           queue=queue,
-                                          algorithm="Classic",
-                                          time_data_location="t",
-                                          quantity_data_location="T_x0",
-                                          quantity_and_unit="Temperature [C]",
                                           save_results=save_results,
                                           not_replot_heatflux=True)
 

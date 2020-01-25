@@ -1,3 +1,5 @@
+import csv
+import time
 import numpy as np    # type: ignore # this has some nice mathematics related functions
 # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
 from scipy.sparse import csr_matrix, diags  # type: ignore
@@ -57,6 +59,8 @@ class Simulation:  # In later objects abreviated as Sim
         # x-positions of the nodes (temperatures)
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.linspace.html
         self.x = np.linspace(0, self.length, N+1)
+        # error_value of the simulation
+        self.error_norm = 0.0
 
         # temperature fields
         # https://docs.scipy.org/doc/numpy/reference/generated/numpy.empty.html
@@ -164,7 +168,36 @@ class Simulation:  # In later objects abreviated as Sim
         #     InverseSimulation()
         self.current_t = self.dt * self.current_step_idx
 
-    def calculate_final_error(self) -> float:
+    def after_simulation_action(self):
+        """
+        Defines what should happen after the simulation is over
+        """
+
+        # Assigning the error value
+        self.error_norm = self._calculate_final_error()
+        print("Error norm after simulation: {}".format(self.error_norm))
+
+    def save_results(self) -> None:
+        """
+        Outputs the (semi)results of a simulation into a CSV file and names it
+            accordingly.
+        """
+
+        # TODO: discuss the possible filename structure
+        file_name = "Classic-{}.csv".format(int(time.time()))
+
+        time_data = self.t
+        temp_data = self.T_x0
+
+        with open(file_name, "w") as csv_file:
+            csv_writer = csv.writer(csv_file)
+            headers = ["Time [s]", "Temperature [C]"]
+            csv_writer.writerow(headers)
+
+            for time_value, temp_value in zip(time_data, temp_data):
+                csv_writer.writerow([time_value, temp_value])
+
+    def _calculate_final_error(self) -> float:
         """
         Determining error value for this simulation at its end
         """
