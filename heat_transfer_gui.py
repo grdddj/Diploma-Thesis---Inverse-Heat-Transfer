@@ -98,6 +98,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self,
             "Choose a data file", "", "CSV Files (*.csv)", options=options)
         if file_path:
+            # Extracting only the name of the file, without the whole path
             file_name = os.path.basename(file_path)
             print(file_name)
 
@@ -110,6 +111,10 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Function to put together the state-change and the specific button
             highlighting that is connected with the new state.
+
+        Args:
+            new_state ... simulation state that we should switch to
+            update_buttons ... whether to reflect the change on buttons
         """
 
         self.simulation_state = new_state
@@ -155,6 +160,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Completely empties the inputted layout, and makes it ready for
             new information.
+
+        Args:
+            layout ... name of the layout which should be cleared
         """
 
         while layout.count():
@@ -167,6 +175,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def show_message_to_user(self, message: str) -> None:
         """
         Shows arbitrary message (general info or error) to the user.
+
+        Args:
+            message ... what should be shown to the user
         """
 
         print(message)
@@ -176,6 +187,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Displays a separate dialog (alert) informing user of something bad, like
             invalid user input.
+
+        Args:
+            error_message ... what should be shown to the user
         """
 
         # TODO: implement the new window creation
@@ -202,6 +216,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def add_saving_choices(self, parent_layout) -> None:
         """
         Including the checkboxes for user to choose if to save data or not
+
+        Args:
+            parent_layout ... into which layout we should include everything
         """
 
         self.saving_choice_layout = QtWidgets.QHBoxLayout()
@@ -217,6 +234,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def add_data_file_choices(self, parent_layout) -> None:
         """
         Including the checkboxes for user to choose if to save data or not
+
+        Args:
+            parent_layout ... into which layout we should include everything
         """
 
         self.file_choice_layout = QtWidgets.QHBoxLayout()
@@ -241,6 +261,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def add_smoothing_options(self, parent_layout) -> None:
         """
         Including the options for smoothing the final result
+
+        Args:
+            parent_layout ... into which layout we should include everything
         """
 
         self.smooth_layout_labels = QtWidgets.QHBoxLayout()
@@ -275,6 +298,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Moderating the connection between this GUI thread and calculation thread
             according the smoothing options after simulation finishes
+
+        Args:
+            option ... which command to send to a smoothing function
         """
 
         if option == "finish":
@@ -297,6 +323,10 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                              specified_algorithm: str = None) -> None:
         """
         Including the radio buttons for user to choose the algorithm
+
+        Args:
+            parent_layout ... into which layout we should include everything
+            specified_algorithm ... if some algorithm is already chosen
         """
 
         self.algorithmlayout = QtWidgets.QHBoxLayout()
@@ -327,6 +357,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Including the labels and input fields for all the input data that
             are required for a current situation (algorithm)
+
+        Args:
+            parent_layout ... into which layout we should include everything
         """
 
         for entry in self.get_current_input_service().number_parameters_to_get_from_user:
@@ -401,6 +434,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def add_material_choice(self, parent_layout) -> None:
         """
         Adding the menu with all possible materials users can choose
+
+        Args:
+            parent_layout  ... into which layout we should include everything
         """
 
         new_layout = QtWidgets.QHBoxLayout()
@@ -538,7 +574,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         Keeping the user notified about the time the simulation is taking.
         Is being called everytime the simulation will emit it's state.
         Parameters:
-            simulation_state (int) Whether the simulation is running (1) or not (0)
+            simulation_state (int) W
+
+        Args:
+            simulation_state  ... whether the simulation is running (1),
+                                  is stopped(0) or has finished (2)
         """
 
         now = time.time()
@@ -568,6 +608,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
         Updates the time value in the time label
         Showing the value in seconds with the precision of 2 decimal places
+
+        Args:
+            time_value  ... time to show on the label
         """
 
         self.time_label_2.setText("TIME: {} s".format(round(time_value, 2)))
@@ -575,6 +618,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def update_error_label(self, error_value: float) -> None:
         """
         Updates the error value in the error label
+
+        Args:
+            error_value  ... how big is the simulation eror
         """
 
         self.error_label_2.setText("ERROR: {}".format(error_value))
@@ -582,6 +628,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def process_output(self, returned_object: dict) -> None:
         """
         Displaying the information returned after the simulation has finished
+
+        Args:
+            returned_object  ... object returned from simulation
         """
 
         print(returned_object)
@@ -591,9 +640,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def lock_inputs_for_editing(self, lock: bool = True) -> None:
         """
         Locks or unlocks all the user inputs.
-        Parameters:
-            lock  (bool) ... If the inputs should be locked (True)
-                             or unlocked (False)
+
+        Args:
+            lock  ... If the inputs should be locked (True) or unlocked (False)
         """
 
         # TODO: find out how to disable the algorithm radio button

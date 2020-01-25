@@ -13,6 +13,11 @@ def simulate_from_gui(parameters_from_gui: dict,
                       progress_callback) -> dict:
     """
     Starts the whole simulation with the inputs from GUI
+
+    Args:
+        parameters_from_gui ... parameters for simulation defined in GUI
+            - including all the references to plots, queues and callbacks
+        progress_callback ... reference of progress callback
     """
 
     return create_and_run_simulation(progress_callback=progress_callback,
@@ -20,14 +25,22 @@ def simulate_from_gui(parameters_from_gui: dict,
 
 
 def create_and_run_simulation(parameters,
+                              heat_flux_plot=None,
                               temperature_plot=None,
                               progress_callback=None,
-                              heat_flux_plot=None,
                               queue=None,
                               save_results: bool = False) -> dict:
     """
     Creates a new simulation object, passes it into the controller
         and makes sure the simulation will finish
+
+    Args:
+        parameters ... all defined parameters of simulation
+        heat_flux_plot ... reference of heat flux plot
+        temperature_plot ... reference of temperature plot
+        progress_callback ... reference of progress callback
+        queue ... reference of the shared queue
+        save_results ... whether to save results at the end or not
     """
 
     my_material = Material(parameters["rho"], parameters["cp"], parameters["lmbd"])

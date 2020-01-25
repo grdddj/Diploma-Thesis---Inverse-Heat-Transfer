@@ -26,11 +26,22 @@ class Simulation:  # In later objects abreviated as Sim
                  length: float,
                  material,
                  experiment_data_path: str = "DATA.csv") -> None:
-        self.N = int(N)  # number of elements in the model
-        self.dt = dt  # fixed time step
-        self.theta = theta  # fixed integration method
-        self.Exp_data = ExperimentalData(experiment_data_path)
+        """
+        Args:
+            N ... number of elements in the model
+            dt ... fixed time step
+            theta ... defining the explicitness/implicitness of the simulation
+            robin_alpha ... coefficient of heat convection
+            x0 ... where is the place of our interest in the object
+            length ... how long is the object
+            material ... object containing material properties
+            experiment_data_path ... from where the data should be taken
+        """
 
+        self.N = int(N)
+        self.dt = dt
+        self.theta = theta
+        self.Exp_data = ExperimentalData(experiment_data_path)
         self.rho = material.rho
         self.cp = material.cp
         self.lmbd = material.lmbd
@@ -176,6 +187,10 @@ class Simulation:  # In later objects abreviated as Sim
 
         Has access to all the variables from SimController, so can
             freely communicate with the GUI
+
+        Args:
+            SimController ... whole simulation controller object
+                - containing all the references to GUI
         """
 
         # Assigning the error value
@@ -205,6 +220,10 @@ class Simulation:  # In later objects abreviated as Sim
     def plot(self, temperature_plot, heat_flux_plot):
         """
         Defining the way simulation data should be plotted
+
+        Args:
+            temperature_plot ... reference to temperature plot
+            heat_flux_plot ... reference to heat flux plot
         """
 
         # Displaying only the data that is calculated ([:self.current_step_idx])

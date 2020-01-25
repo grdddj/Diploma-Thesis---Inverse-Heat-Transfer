@@ -1,8 +1,15 @@
 """
 This module is defining general infrastructure for the simulations
-It can be easily imported and used for any simulation that
-    has the same API as defined here (functions prepare_simulation(),
-    complete_simulation(), Sim object etc.)
+
+It can be easily imported and used for any simulation (Sim) that
+    is supporting the public API as defined here:
+    - Sim.current_t ... storing the current simulation time
+    - Sim.simulation_has_finished ... boolean if simulation is over or not
+    - Sim.error_norm ... determining the simulation error
+    - Sim.plot() ... updating the results on the plots
+    - Sim.evaluate_one_step() ... moving one step further in the simulation
+    - Sim.after_simulation_action() ... what should happen after the simulation
+    - Sim.save_results() ... custom method for saving results
 """
 
 import time
@@ -22,6 +29,15 @@ class Callback:
                  temperature_plot=None,
                  queue=None,
                  progress_callback=None) -> None:
+        """
+        Args:
+            call_at ... the frequency in simulation second when to be called
+            heat_flux_plot ... reference of heat flux plot
+            temperature_plot ... reference of temperature plot
+            queue ... reference of the shared queue
+            progress_callback ... reference of progress callback
+        """
+
         self.call_at = call_at  # how often to be called
         self.last_call = 0.0  # time in which the callback was last called
 
@@ -57,6 +73,10 @@ class Callback:
                  force_update: bool = False) -> str:
         """
         Defining what should happend when the callback will be called
+
+        Args:
+            Sim ... the whole simulation object
+            force_update ... whether to perform actions regardless of current time
         """
 
         # Doing something when it is time to comunicate with GUI
@@ -104,6 +124,17 @@ class SimulationController:
                  temperature_plot=None,
                  heat_flux_plot=None,
                  save_results: bool = False):
+        """
+        Args:
+            Sim ... whole simulation object
+            parameters ... all defined parameters of simulation
+            heat_flux_plot ... reference of heat flux plot
+            temperature_plot ... reference of temperature plot
+            queue ... reference of the shared queue
+            progress_callback ... reference of progress callback
+            save_results ... whether to save results at the end or not
+        """
+
         self.Sim = Sim
         self.MyCallBack = Callback(progress_callback=progress_callback,
                                    call_at=parameters["callback_period"],

@@ -20,16 +20,33 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                  N: int,
                  dt: float,
                  theta: float,
-                 material,
                  robin_alpha: float,
                  x0: float,
                  length: float,
+                 material,
                  window_span: int,
                  tolerance: float,
                  q_init: float,
                  init_q_adjustment: float,
                  adjusting_value: float,
                  experiment_data_path: str = "DATA.csv"):
+        """
+        Args:
+            N ... number of elements in the model
+            dt ... fixed time step
+            theta ... defining the explicitness/implicitness of the simulation
+            robin_alpha ... coefficient of heat convection
+            x0 ... where is the place of our interest in the object
+            length ... how long is the object
+            material ... object containing material properties
+            window_span ... how many windows evaluate into the future
+            tolerance ... tolerance for accepting the heat flux
+            q_init ... initial value of all heat flux time values
+            init_q_adjustment ... starting value of heat flux adjustments
+            adjusting_value ... how should be the heat flux adjusted
+            experiment_data_path ... from where the data should be taken
+        """
+
         super().__init__(length=length,
                          material=material,
                          N=N,
@@ -42,7 +59,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         self.init_q_adjustment = init_q_adjustment
         self.adjusting_value = adjusting_value
 
-        # Storing the amount of iterations we make for the simulation
+        # Storing the amount of iterations we made for the simulation
         self.number_of_iterations = 0
 
         # fluxes to be resolved
@@ -65,6 +82,8 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             self.Sim: {self},
             self.window_span: {self.window_span},
             self.tolerance: {self.tolerance},
+            self.init_q_adjustment: {self.init_q_adjustment},
+            self.adjusting_value: {self.adjusting_value},
             """
 
     def evaluate_one_step(self) -> None:
@@ -84,10 +103,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         self._make_checkpoint()
         # initial adjustments to heat flux being currently solved
         q_adj = self.init_q_adjustment
-        # explicit portion
+        # Assigning all the fluxes in the windows we are interested to be
+        #   the previously solved heat flux
         self.HeatFlux[self.current_q_idx:self.current_q_idx+self.window_span] = self.HeatFlux[self.current_q_idx-1]
-        # implicit portion
-        # self.HeatFlux[self.current_q_idx+1] = self.HeatFlux[self.current_q_idx-1]
         prev_error = self._evaluate_window_error_norm()
         iter_no = 0
         while True:
@@ -117,10 +135,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                 prev_error = new_error
                 self._revert_to_checkpoint()
 
-            # adjust heatflux a little in the explicit and implicit portion
+            # adjust heatflux a little in all the windows
             self.HeatFlux[self.current_q_idx:self.current_q_idx+self.window_span] += q_adj
-            # self.HeatFlux[self.current_q_idx+1] += q_adj
-        # since the current flux is adjusted enough tell the Prob to adjust
+        # Since the current flux is adjusted enough tell the Prob to adjust
         #   next one in next SolveInverseStep call
         self.current_q_idx += 1
 
@@ -130,6 +147,10 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
 
         Has access to all the variables from SimController, so can
             freely communicate with the GUI
+
+        Args:
+            SimController ... whole simulation controller object
+                - containing all the references to GUI
         """
 
         # Determining the error margin before smoothing
@@ -170,6 +191,10 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
     def plot(self, temperature_plot, heat_flux_plot):
         """
         Defining the way simulation data should be plotted
+
+        Args:
+            temperature_plot ... reference to temperature plot
+            heat_flux_plot ... reference to heat flux plot
         """
 
         # Displaying only the data that is calculated ([:self.current_step_idx])
@@ -202,6 +227,10 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         """
         Is responsible for smoothing the result according to user input
             from the GUI through the shared queue
+
+        Args:
+            SimController ... whole simulation controller object
+                - containing all the references to GUI
         """
 
         if SimController.progress_callback is not None:
@@ -258,6 +287,10 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         OR
         Moving average method
         https://stackoverflow.com/questions/20618804/how-to-smooth-a-curve-in-the-right-way#answer-26337730
+
+        Args:
+            window_length ... how many windows should be combine together
+                              when performing the smoothing
         """
 
         # Choosing which method to use (manually so far)
@@ -301,6 +334,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         """
         Running the parent evaluate_one_step() function multiple times
             to evaluate more steps at once
+
+        Args:
+            n_steps ... how many steps to evaluate
         """
 
         for _ in range(n_steps):
