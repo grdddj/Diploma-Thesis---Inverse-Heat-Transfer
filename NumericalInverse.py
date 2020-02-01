@@ -79,7 +79,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         """
 
         return f"""
-            self.Sim: {self},
+            self.Sim: {super().__repr__()},
             self.window_span: {self.window_span},
             self.tolerance: {self.tolerance},
             self.init_q_adjustment: {self.init_q_adjustment},
