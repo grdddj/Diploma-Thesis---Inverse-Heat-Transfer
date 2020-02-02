@@ -50,7 +50,7 @@ def _T_amb_rand_data(size: int, start: float = 21,
     return arr
 
 
-def sinus_data():
+def sinus_data(file_name: str = "sinus_data.csv") -> None:
     """
     Creating a defined sinus wave
     """
@@ -58,21 +58,21 @@ def sinus_data():
     no_elements = 666
     amplitude = 1000
     cycles = 3
-    file_name = "sinus_data.csv"
 
     t_data = np.arange(0, no_elements, 1)
     sin_periods = np.linspace(0, 2*np.pi*cycles, no_elements)
     q_data = amplitude*np.sin(sin_periods)
 
-    T_amb_data = _T_amb_rand_data(no_elements, 21, 0.05)
+    T_amb_data = _T_amb_rand_data(size=no_elements, start=21, diff_value=0.001)
 
-    _save_data(t_data, q_data, T_amb_data, file_name)
+    _save_data(t_data=t_data, q_data=q_data,
+               T_amb_data=T_amb_data, file_name=file_name)
 
     plt.plot(t_data, q_data)
     plt.show()
 
 
-def square_data():
+def square_data(file_name: str = "square_data.csv") -> None:
     """
     Creating a defined square wave
     """
@@ -81,7 +81,6 @@ def square_data():
     low_value = 0
     high_value = 200
     cycles = 4
-    file_name = "square_data.csv"
 
     # Calculating the length of each segment, and then real number of elements
     length = no_elements // (2*cycles+1)
@@ -94,9 +93,10 @@ def square_data():
     for i in range(2*cycles+1):
         q_data[length*i:length*(i+1)] = high_value if i % 2 == 0 else low_value
 
-    T_amb_data = _T_amb_rand_data(no_elements, 21, 0.05)
+    T_amb_data = _T_amb_rand_data(size=no_elements, start=21, diff_value=0.001)
 
-    _save_data(t_data, q_data, T_amb_data, file_name)
+    _save_data(t_data=t_data, q_data=q_data,
+               T_amb_data=T_amb_data, file_name=file_name)
 
     plt.plot(t_data, q_data)
     plt.show()

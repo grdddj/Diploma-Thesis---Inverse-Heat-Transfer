@@ -53,7 +53,8 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                          theta=theta,
                          robin_alpha=robin_alpha,
                          dt=dt,
-                         x0=x0)
+                         x0=x0,
+                         experiment_data_path=experiment_data_path)
         self.window_span = window_span
         self.tolerance = tolerance
         self.init_q_adjustment = init_q_adjustment
