@@ -4,6 +4,7 @@ This module is hosting class responsible for the inverse simulation
 
 import csv
 import time
+import math
 import numpy as np  # type: ignore
 from scipy.signal import savgol_filter  # type: ignore
 from NumericalForward import Simulation
@@ -26,7 +27,6 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                  material,
                  window_span: int,
                  tolerance: float,
-                 q_init: float,
                  init_q_adjustment: float,
                  adjusting_value: float,
                  experiment_data_path: str = "DATA.csv"):
@@ -41,7 +41,6 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
             material ... object containing material properties
             window_span ... how many windows evaluate into the future
             tolerance ... tolerance for accepting the heat flux
-            q_init ... initial value of all heat flux time values
             init_q_adjustment ... starting value of heat flux adjustments
             adjusting_value ... how should be the heat flux adjusted
             experiment_data_path ... from where the data should be taken
@@ -65,7 +64,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
 
         # fluxes to be resolved
         self.current_q_idx = 0  # initial index
-        self.HeatFlux.fill(q_init)  # change initial values
+        self.HeatFlux.fill(0)  # change initial values
 
         # Varibles for smoothing purposes - long list for storing whole
         #   history and stored index
@@ -249,16 +248,19 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                     if msg == "back":
                         # Reverting the smoothing
                         self._revert_the_smoothing()
-                    elif msg.startswith("smooth_"):
+                    elif msg.startswith("smooth__"):
                         # Performing the defined smoothing
                         # Parsing the window length from the message
+                        # Message = smooth__(length)__(method)
                         try:
-                            length = int(msg[len("smooth_"):])
-                        except ValueError:
-                            # Length of 1 will not do anything
-                            print("unparseable window length:", length)
-                            length = 1
-                        self._smooth_the_result(window_length=length)
+                            length = int(msg.split("__")[1])
+                            method = msg.split("__")[2]
+                        except (ValueError, IndexError):
+                            # When something cannot be parsed, skip it
+                            print("unparseable message:", msg)
+                            continue
+                        self._smooth_the_result(window_length=length,
+                                                method=method)
 
                     # Updating the plot after smoothing or reverting
                     self.plot(temperature_plot=SimController.temperature_plot,
@@ -279,7 +281,9 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         else:
             print("cannot revert anymore")
 
-    def _smooth_the_result(self, window_length: int = None) -> None:
+    def _smooth_the_result(self,
+                           window_length: int = None,
+                           method: str = "moving_avg") -> None:
         """
         Making the final result smoothed - modifying the resulting HeatFlux
 
@@ -292,32 +296,79 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
         Args:
             window_length ... how many windows should be combine together
                               when performing the smoothing
+            method ... which of the implemented methods to use
         """
 
-        # Choosing which method to use (manually so far)
-        # The moving average seems to yield better results
-        method = "moving_avg"
-
         # Saving the current flux to be able to revert to it later
-        current_flux = self.HeatFlux[:]
-        self.smooth_history[self.smooth_index] = current_flux
+        self.smooth_history[self.smooth_index] = self.HeatFlux[:]
 
         # Performing the chosen smoothing
         if method == "savgol":
+            polynomic_order = 2
+
+            # When undefined, take some semi-random window length
             if window_length is None:
                 window_length = self.HeatFlux.size // 20
-                # Window window_length must be odd
-                if window_length % 2 == 0:
-                    window_length += 1
-            self.HeatFlux = savgol_filter(self.HeatFlux, window_length, 2)
+
+            # Windows length must be bigger than polynomic order
+            if window_length <= polynomic_order:
+                window_length = polynomic_order + 1
+
+            # Window length must be odd
+            if window_length % 2 == 0:
+                window_length += 1
+
+            self.HeatFlux = savgol_filter(self.HeatFlux, window_length, polynomic_order)
         elif method == "moving_avg":
             if window_length is None:
                 window_length = self.HeatFlux.size // 50
             box = np.ones(window_length)/window_length
-            self.HeatFlux = np.convolve(self.HeatFlux, box, mode='same')
+            smooth_result = np.convolve(self.HeatFlux, box, mode='same')
+            smooth_result_with_boundaries = self._smooth_boundary(
+                y_smooth=smooth_result, window_length=window_length)
+            self.HeatFlux = smooth_result_with_boundaries
 
         # Increasing the smoothing index for the future
         self.smooth_index += 1
+
+    def _smooth_boundary(self, y_smooth, window_length: int):
+        """
+        Finishes the moving average smoothing - makes sure that even the
+            boundaries will be averaged out, and they will have values
+            that make sense
+
+        Args:
+            y_smooth ... array of already smoothed values from moving averages
+            window_length ... how many windows should be combine together
+                              when performing the smoothing
+        """
+
+        # Cloning the initial array, not to overwrite it in place
+        y_smoothed_boundaries = y_smooth[:]
+
+        # Determining the size of the boundary, which is half of the window length
+        half = window_length / 2
+
+        # Transforming the left boundary
+        for i in range(math.floor(half)):
+            coefficient = window_length / (math.ceil(half) + i)
+            y_smoothed_boundaries[i] = y_smooth[i] * coefficient
+
+        # Transforming the right boundary, but only if the window is larger than 2
+        if window_length > 2:
+            # There is a slight difference in having even or odd number of
+            #   windows. Reason being that in even number of windows,
+            #   the algorithm is taking more previous points than next points
+            if window_length % 2 == 0:
+                for i in range(1, math.floor(half)+1):
+                    coefficient = window_length / (math.ceil(half) + i)
+                    y_smoothed_boundaries[-i] = y_smooth[-i] * coefficient
+            else:
+                for i in range(1, math.floor(half)+1):
+                    coefficient = window_length / (math.ceil(half) + i - 1)
+                    y_smoothed_boundaries[-i] = y_smooth[-i] * coefficient
+
+        return y_smoothed_boundaries
 
     def _evaluate_window_error_norm(self) -> float:
         """

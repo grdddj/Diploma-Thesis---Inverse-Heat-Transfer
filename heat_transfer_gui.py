@@ -67,6 +67,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         # Saving the material we are simulating right now
         self.chosen_material = None
 
+        # Storing current data file
+        self.current_data_file = "DATA.csv"
+
         # Variables to keep user informed about the elapsed simulation time
         # TODO: probably create an individual object for this
         #       - also the logic could be maybe simplified
@@ -98,6 +101,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self,
             "Choose a data file", "", "CSV Files (*.csv)", options=options)
         if file_path:
+            # Storing the new data file path
+            self.current_data_file = file_path
             # Extracting only the name of the file, without the whole path
             file_name = os.path.basename(file_path)
             print(file_name)
@@ -266,16 +271,22 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             parent_layout ... into which layout we should include everything
         """
 
+        # Creating all layouts (rows) we want to generate
         self.smooth_layout_labels = QtWidgets.QHBoxLayout()
         self.smooth_layout_buttons = QtWidgets.QHBoxLayout()
+        self.smooth_alforithm_choice = QtWidgets.QGroupBox("Smoothing algorithm")
+        self.smooth_radio_choice_layout = QtWidgets.QVBoxLayout()
+        self.smooth_layout_radios = QtWidgets.QHBoxLayout()
 
-        label = QtWidgets.QLabel("Window length: ")
-        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        # Creating the label and input for window length
+        window_length_label = QtWidgets.QLabel("Window length: ")
+        window_length_label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
 
         self.window_length_input = QtWidgets.QLineEdit()
         self.window_length_input.setText("2")
         self.window_length_input.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
 
+        # Creating the controlling buttons
         smooth_btn = QtWidgets.QPushButton('Smooth', self)
         smooth_btn.clicked.connect(lambda: self.send_smoothing_option("smooth"))
 
@@ -285,14 +296,26 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         finish_btn = QtWidgets.QPushButton('Finish', self)
         finish_btn.clicked.connect(lambda: self.send_smoothing_option("finish"))
 
-        self.smooth_layout_labels.addWidget(label)
+        self.smooth_choice_moving_avg = QtWidgets.QRadioButton("Moving average")
+        self.smooth_choice_savgol = QtWidgets.QRadioButton("Savgol")
+        self.smooth_choice_moving_avg.setChecked(True)
+
+        # Including all the widgets into their appropriate layouts (rows)
+        self.smooth_layout_labels.addWidget(window_length_label)
         self.smooth_layout_labels.addWidget(self.window_length_input)
         self.smooth_layout_buttons.addWidget(smooth_btn)
         self.smooth_layout_buttons.addWidget(back_btn)
         self.smooth_layout_buttons.addWidget(finish_btn)
+        self.smooth_radio_choice_layout.addWidget(self.smooth_choice_moving_avg)
+        self.smooth_radio_choice_layout.addWidget(self.smooth_choice_savgol)
+        self.smooth_alforithm_choice.setLayout(self.smooth_radio_choice_layout)
 
-        parent_layout.addLayout(self.smooth_layout_buttons)
+        self.smooth_layout_radios.addWidget(self.smooth_alforithm_choice)
+
+        # Including all the layouts in chosen order into the parent layout
+        parent_layout.addLayout(self.smooth_layout_radios)
         parent_layout.addLayout(self.smooth_layout_labels)
+        parent_layout.addLayout(self.smooth_layout_buttons)
 
     def send_smoothing_option(self, option: str):
         """
@@ -300,7 +323,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             according the smoothing options after simulation finishes
 
         Args:
-            option ... which command to send to a smoothing function
+            option ... which supported command to send to a smoothing function
         """
 
         if option == "finish":
@@ -310,11 +333,13 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             # Hide the smoothing options
             self.clear_layout(self.smooth_layout_labels)
             self.clear_layout(self.smooth_layout_buttons)
+            self.clear_layout(self.smooth_layout_radios)
         elif option == "back":
             self.queue.put("back")
         elif option == "smooth":
-            command = "smooth_{}".format(self.window_length_input.text())
-            # option = self.window_length_input.text()
+            # Including the window length and specific smoothing algorithm
+            command = "smooth__{}__{}".format(self.window_length_input.text(),
+                self.get_current_smoothing_algorithm())
             print("command", command)
             self.queue.put(command)
 
@@ -399,6 +424,18 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             return "classic"
         elif self.radio_choice_inverse.isChecked():
             return "inverse"
+
+        return "no algorithm"
+
+    def get_current_smoothing_algorithm(self) -> str:
+        """
+        Simplifies the access to current smoothing algorithm
+        """
+
+        if self.smooth_choice_moving_avg.isChecked():
+            return "moving_avg"
+        elif self.smooth_choice_savgol.isChecked():
+            return "savgol"
 
         return "no algorithm"
 
@@ -528,7 +565,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         parameters["rho"] = current_material_properties["rho"]
         parameters["cp"] = current_material_properties["cp"]
         parameters["lmbd"] = current_material_properties["lmbd"]
-        parameters["experiment_data_path"] = self.data_file_input.text()
+        parameters["experiment_data_path"] = self.current_data_file
 
         # Disabling the user from modifying inputs
         self.lock_inputs_for_editing(True)

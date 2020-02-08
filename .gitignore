@@ -1,6 +1,6 @@
 dist
 build
-trial*
+*trial*
 __pycache__
 *csv
 *.png

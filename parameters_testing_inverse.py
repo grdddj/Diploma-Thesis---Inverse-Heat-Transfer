@@ -21,32 +21,36 @@ def perform_tests():
     testing_scenarios = [
         {
             "parameter": "number_of_elements",
-            # "values": list(map(int, np.linspace(1, 1000, steps)))
-            "values": range(1, 100, 50)
+            "values": list(map(int, np.linspace(1, 1000, steps)))
+            # "values": range(1, 100, 50)
         },
         {
             "parameter": "dt",
-            # "values": list(map(int, np.linspace(1, 1000, steps)))
-            "values": range(20, 120, 50)
+            "values": list(map(int, np.linspace(1, 1000, steps)))
+            # "values": range(20, 120, 50)
         },
         {
             "parameter": "theta",
-            # "values": np.linspace(0.5, 1.0, steps)
-            "values": np.arange(0.5, 1.0, 0.2)
+            "values": np.linspace(0.5, 1.0, steps)
+            # "values": np.arange(0.5, 1.0, 0.2)
         },
         {
             "parameter": "window_span",
-            # "values": np.arange(1, 10, 1)
-            "values": range(2, 10)
+            "values": np.arange(1, 20, 1)
+            # "values": range(2, 10)
         },
         {
             "parameter": "tolerance",
-            # "values": np.logspace(-5, -1, num=20, base=10)
-            "values": np.logspace(-5, -1, num=3, base=10)
+            "values": np.logspace(-5, -1, num=20, base=10)
+            # "values": np.logspace(-5, -1, num=3, base=10)
         },
         {
             "parameter": "adjusting_value",
             "values": np.arange(-0.99, -0.00, 0.02)
+        },
+        {
+            "parameter": "init_q_adjustment",
+            "values": np.arange(1, 50, 0.5)
         }
     ]
 

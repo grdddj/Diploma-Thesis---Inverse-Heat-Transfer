@@ -134,7 +134,7 @@ def show_data_in_jpg(data: dict,
         fig.tight_layout()  # otherwise the right y-label is slightly clipped
         # plt.show()
 
-        file_name_for_picture = "{}-{}.jpg".format(file_name.strip(".json"),
+        file_name_for_picture = "{}-{}.png".format(file_name.strip(".json"),
                                                    parameter)
         plt.savefig(file_name_for_picture)
 
@@ -190,7 +190,6 @@ def run_multiple_simulations(simulation_func: Callable,
         "theta": 0.5,
         "window_span": 2,
         "tolerance": 1e-05,
-        "q_init": 0,
         "init_q_adjustment": 20,
         "adjusting_value": -0.7,
         "experiment_data_path": "DATA.csv"
