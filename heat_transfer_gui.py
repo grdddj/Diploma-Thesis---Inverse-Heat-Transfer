@@ -11,7 +11,11 @@ import time
 import threading
 import queue
 
-from PyQt5 import QtWidgets, QtGui, QtCore  # type: ignore
+from PyQt5.QtGui import QFont # type: ignore
+from PyQt5.QtCore import QThreadPool, Qt
+from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox,
+    QLabel, QLineEdit, QPushButton, QGroupBox, QRadioButton, QComboBox,
+    QFormLayout, QDialogButtonBox, QApplication, QDialog)
 from PyQt5.uic import loadUiType  # type: ignore
 
 import heat_transfer_simulation
@@ -79,7 +83,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.time_spent_paused = 0
         self.time_in_progress = 0
 
-        self.threadpool = QtCore.QThreadPool()
+        self.threadpool = QThreadPool()
         print("Multithreading with maximum {} threads".format(self.threadpool.maxThreadCount()))
         print("Current thread: " + threading.currentThread().getName())
 
@@ -96,9 +100,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         Opens a dialog for the choice of a data file
         """
 
-        options = QtWidgets.QFileDialog.Options()
-        options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self,
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_path, _ = QFileDialog.getOpenFileName(self,
             "Choose a data file", "", "CSV Files (*.csv)", options=options)
         if file_path:
             # Storing the new data file path
@@ -226,10 +230,10 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             parent_layout ... into which layout we should include everything
         """
 
-        self.saving_choice_layout = QtWidgets.QHBoxLayout()
+        self.saving_choice_layout = QHBoxLayout()
 
-        self.save_plots_checkbox = QtWidgets.QCheckBox("Save plots")
-        self.save_data_checkbox = QtWidgets.QCheckBox("Save data")
+        self.save_plots_checkbox = QCheckBox("Save plots")
+        self.save_data_checkbox = QCheckBox("Save data")
 
         self.saving_choice_layout.addWidget(self.save_plots_checkbox)
         self.saving_choice_layout.addWidget(self.save_data_checkbox)
@@ -244,17 +248,17 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             parent_layout ... into which layout we should include everything
         """
 
-        self.file_choice_layout = QtWidgets.QHBoxLayout()
+        self.file_choice_layout = QHBoxLayout()
 
-        label = QtWidgets.QLabel("Data file: ")
-        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        label = QLabel("Data file: ")
+        label.setFont(QFont("Times", 15, QFont.Bold))
 
-        self.data_file_input = QtWidgets.QLineEdit()
+        self.data_file_input = QLineEdit()
         self.data_file_input.setText("DATA.csv")
-        self.data_file_input.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        self.data_file_input.setFont(QFont("Times", 15, QFont.Bold))
         self.data_file_input.setReadOnly(True)
 
-        choice_button = QtWidgets.QPushButton('Choose', self)
+        choice_button = QPushButton('Choose', self)
         choice_button.clicked.connect(self.open_file_name_dialog)
 
         self.file_choice_layout.addWidget(label)
@@ -272,32 +276,32 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
 
         # Creating all layouts (rows) we want to generate
-        self.smooth_layout_labels = QtWidgets.QHBoxLayout()
-        self.smooth_layout_buttons = QtWidgets.QHBoxLayout()
-        self.smooth_alforithm_choice = QtWidgets.QGroupBox("Smoothing algorithm")
-        self.smooth_radio_choice_layout = QtWidgets.QVBoxLayout()
-        self.smooth_layout_radios = QtWidgets.QHBoxLayout()
+        self.smooth_layout_labels = QHBoxLayout()
+        self.smooth_layout_buttons = QHBoxLayout()
+        self.smooth_alforithm_choice = QGroupBox("Smoothing algorithm")
+        self.smooth_radio_choice_layout = QVBoxLayout()
+        self.smooth_layout_radios = QHBoxLayout()
 
         # Creating the label and input for window length
-        window_length_label = QtWidgets.QLabel("Window length: ")
-        window_length_label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        window_length_label = QLabel("Window length: ")
+        window_length_label.setFont(QFont("Times", 15, QFont.Bold))
 
-        self.window_length_input = QtWidgets.QLineEdit()
+        self.window_length_input = QLineEdit()
         self.window_length_input.setText("2")
-        self.window_length_input.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        self.window_length_input.setFont(QFont("Times", 15, QFont.Bold))
 
         # Creating the controlling buttons
-        smooth_btn = QtWidgets.QPushButton('Smooth', self)
+        smooth_btn = QPushButton('Smooth', self)
         smooth_btn.clicked.connect(lambda: self.send_smoothing_option("smooth"))
 
-        back_btn = QtWidgets.QPushButton('Back', self)
+        back_btn = QPushButton('Back', self)
         back_btn.clicked.connect(lambda: self.send_smoothing_option("back"))
 
-        finish_btn = QtWidgets.QPushButton('Finish', self)
+        finish_btn = QPushButton('Finish', self)
         finish_btn.clicked.connect(lambda: self.send_smoothing_option("finish"))
 
-        self.smooth_choice_moving_avg = QtWidgets.QRadioButton("Moving average")
-        self.smooth_choice_savgol = QtWidgets.QRadioButton("Savgol")
+        self.smooth_choice_moving_avg = QRadioButton("Moving average")
+        self.smooth_choice_savgol = QRadioButton("Savgol")
         self.smooth_choice_moving_avg.setChecked(True)
 
         # Including all the widgets into their appropriate layouts (rows)
@@ -354,13 +358,13 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             specified_algorithm ... if some algorithm is already chosen
         """
 
-        self.algorithmlayout = QtWidgets.QHBoxLayout()
+        self.algorithmlayout = QHBoxLayout()
 
-        label = QtWidgets.QLabel("Algorithm choice:")
-        label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+        label = QLabel("Algorithm choice:")
+        label.setFont(QFont("Times", 15, QFont.Bold))
 
-        self.radio_choice_classic = QtWidgets.QRadioButton("Classic")
-        self.radio_choice_inverse = QtWidgets.QRadioButton("Inverse")
+        self.radio_choice_classic = QRadioButton("Classic")
+        self.radio_choice_inverse = QRadioButton("Inverse")
 
         # Seeing which algorithm should be checked (useful when rerendering the inputs)
         if specified_algorithm is None or specified_algorithm == "classic":
@@ -388,16 +392,16 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
 
         for entry in self.get_current_input_service().number_parameters_to_get_from_user:
-            new_layout = QtWidgets.QHBoxLayout()
+            new_layout = QHBoxLayout()
 
             label_text = "{} [{}]:".format(entry["name"], entry["unit_abbrev"])
-            label = QtWidgets.QLabel(label_text)
-            label.setFont(QtGui.QFont("Times", 15, QtGui.QFont.Bold))
+            label = QLabel(label_text)
+            label.setFont(QFont("Times", 15, QFont.Bold))
             label.setToolTip(entry["description"])
 
-            setattr(self, entry["input_name"], QtWidgets.QLineEdit())
+            setattr(self, entry["input_name"], QLineEdit())
             getattr(self, entry["input_name"]).setText(str(entry["default_value"]))
-            getattr(self, entry["input_name"]).setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
+            getattr(self, entry["input_name"]).setFont(QFont("Times", 20, QFont.Bold))
             # TODO: add validation to only allow for numbers here
 
             new_layout.addWidget(label)
@@ -476,22 +480,56 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             parent_layout  ... into which layout we should include everything
         """
 
-        new_layout = QtWidgets.QHBoxLayout()
+        new_layout = QHBoxLayout()
 
-        self.material_combo_box = QtWidgets.QComboBox()
-        self.material_combo_box.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
+        self.material_combo_box = QComboBox()
+        self.material_combo_box.setFont(QFont("Times", 15, QFont.Bold))
         self.material_combo_box.addItems(material_service.materials_name_list)
         self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index('Iron'))
 
-        label = QtWidgets.QLabel("Material: ")
-        label.setFont(QtGui.QFont("Times", 20, QtGui.QFont.Bold))
+        label = QLabel("Material: ")
+        label.setFont(QFont("Times", 15, QFont.Bold))
+
+        custom_material_button = QPushButton('Custom', self)
+        custom_material_button.clicked.connect(self.get_custom_material)
 
         new_layout.addWidget(label)
         new_layout.addWidget(self.material_combo_box)
+        new_layout.addWidget(custom_material_button)
 
         parent_layout.addLayout(new_layout)
         # TODO: add a tooltip with information whenever the material is highlighted:
         #   https://www.tutorialspoint.com/pyqt/pyqt_qcombobox_widget.htm
+
+    def get_custom_material(self):
+        """
+        Getting and parsing custom material data from the user
+        """
+
+        # Instantiating the dialog and getting its results
+        dialog = CustomMaterialInputDialog()
+        if dialog.exec():
+            results = dialog.get_inputs()
+            print(results)
+
+            # Catching the possible error
+            if results == "error":
+                error_msg = "Error happened when parsing custom material data."
+                print(error_msg)
+                self.show_message_to_user(error_msg)
+            # Otherwise save all the custom data
+            # TODO: we could even save this material to our material file
+            else:
+                # Including the name of new material into the material choice
+                self.material_combo_box.addItem(results["name"])
+
+                # Choosing the new material in the material choice
+                index = self.material_combo_box.findText(results["name"], Qt.MatchFixedString)
+                if index >= 0:
+                     self.material_combo_box.setCurrentIndex(index)
+
+                # Saving the custom material properties
+                material_service.materials_properties_dict[results["name"]] = results["properties"]
 
     def simulation_finished(self) -> None:
         """
@@ -693,6 +731,55 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.material_combo_box.setEnabled(not lock)
 
 
+class CustomMaterialInputDialog(QDialog):
+    """
+    Class defining input dialog to get custom material data from the user
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.name = QLineEdit(self)
+        self.rho = QLineEdit(self)
+        self.cp = QLineEdit(self)
+        self.lmbd = QLineEdit(self)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self);
+
+        layout = QFormLayout(self)
+        layout.addRow("Material name", self.name)
+        layout.addRow("Rho [kg/m3]", self.rho)
+        layout.addRow("Cp [J/(kg*K)]", self.cp)
+        layout.addRow("Lambda [W/(m*K)]", self.lmbd)
+        layout.addWidget(buttonBox)
+
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+
+        self.setWindowTitle('Custom material choice')
+
+    def get_inputs(self):
+        """
+        Defines the way inputs will be returned
+        """
+
+        # Trying to parse all numerical values to floats
+        # Also replacing possible commas with a dot, to be parseable
+        # If unsuccessful, returning error string, which will be caught later
+        try:
+            returned_info = {
+                "name": self.name.text(),
+                "properties": {
+                    "rho": float(self.rho.text().replace(",", ".")),
+                    "cp": float(self.cp.text().replace(",", ".")),
+                    "lmbd": float(self.lmbd.text().replace(",", "."))
+                }
+            }
+        except ValueError:
+            returned_info = "error"
+
+        return returned_info
+
+
 if __name__ == '__main__':
     # Necessary stuff for errors and exceptions to be thrown
     # Without this, the app just dies and says nothing
@@ -704,7 +791,7 @@ if __name__ == '__main__':
         sys.exit(1)
     sys.excepthook = exception_hook
 
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     heat_transfer_window = HeatTransferWindow()
 
     # heat_transfer_window.showMaximized()
