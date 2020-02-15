@@ -11,9 +11,9 @@ import time
 import threading
 import queue
 
-from PyQt5.QtGui import QFont # type: ignore
-from PyQt5.QtCore import QThreadPool, Qt
-from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox,
+from PyQt5.QtGui import QFont, QDoubleValidator # type: ignore
+from PyQt5.QtCore import QThreadPool, Qt # type: ignore
+from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox, # type: ignore
     QLabel, QLineEdit, QPushButton, QGroupBox, QRadioButton, QComboBox,
     QFormLayout, QDialogButtonBox, QApplication, QDialog)
 from PyQt5.uic import loadUiType  # type: ignore
@@ -37,7 +37,7 @@ user_input_service_inverse = UserInputServiceInverse()
 # Creating the UI from the .ui template
 # We could also generate a .py file from it and import it
 #   - worth a try later, now for development purposes this is more comfortable
-Ui_MainWindow, QMainWindow = loadUiType('heat_transfer_gui.ui')
+Ui_MainWindow, QMainWindow = loadUiType("heat_transfer_gui.ui")
 
 
 class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
@@ -140,16 +140,16 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
         # TODO: research some better way, as this is quite awkward, to assign
         #       always the whole stylesheet
-        font = 'font: 20pt "MS Shell Dlg 2";'
-        border = 'border: 1px solid black;'
-        border_active = 'border: 15px solid black;'
-        color_run = 'background-color: rgb(0, 255, 0);'
-        color_pause = 'background-color: rgb(255, 140, 0);'
-        color_stop = 'background-color: rgb(255, 0, 0);'
+        font = "font: 20pt 'MS Shell Dlg 2';"
+        border = "border: 1px solid black;"
+        border_active = "border: 15px solid black;"
+        color_run = "background-color: rgb(0, 255, 0);"
+        color_pause = "background-color: rgb(255, 140, 0);"
+        color_stop = "background-color: rgb(255, 0, 0);"
 
-        run_stylesheet = '{} {} {}'.format(font, color_run, border_active if self.simulation_state == "running" else border)
-        pause_stylesheet = '{} {} {}'.format(font, color_pause, border_active if self.simulation_state == "paused" else border)
-        stop_stylesheet = '{} {} {}'.format(font, color_stop, border_active if self.simulation_state == "stopped" else border)
+        run_stylesheet = "{} {} {}".format(font, color_run, border_active if self.simulation_state == "running" else border)
+        pause_stylesheet = "{} {} {}".format(font, color_pause, border_active if self.simulation_state == "paused" else border)
+        stop_stylesheet = "{} {} {}".format(font, color_stop, border_active if self.simulation_state == "stopped" else border)
         self.button_run_3.setStyleSheet(run_stylesheet)
         self.button_pause_3.setStyleSheet(pause_stylesheet)
         self.button_stop_3.setStyleSheet(stop_stylesheet)
@@ -258,7 +258,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.data_file_input.setFont(QFont("Times", 15, QFont.Bold))
         self.data_file_input.setReadOnly(True)
 
-        choice_button = QPushButton('Choose', self)
+        choice_button = QPushButton("Choose", self)
         choice_button.clicked.connect(self.open_file_name_dialog)
 
         self.file_choice_layout.addWidget(label)
@@ -291,13 +291,13 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.window_length_input.setFont(QFont("Times", 15, QFont.Bold))
 
         # Creating the controlling buttons
-        smooth_btn = QPushButton('Smooth', self)
+        smooth_btn = QPushButton("Smooth", self)
         smooth_btn.clicked.connect(lambda: self.send_smoothing_option("smooth"))
 
-        back_btn = QPushButton('Back', self)
+        back_btn = QPushButton("Back", self)
         back_btn.clicked.connect(lambda: self.send_smoothing_option("back"))
 
-        finish_btn = QPushButton('Finish', self)
+        finish_btn = QPushButton("Finish", self)
         finish_btn.clicked.connect(lambda: self.send_smoothing_option("finish"))
 
         self.smooth_choice_moving_avg = QRadioButton("Moving average")
@@ -399,10 +399,17 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
             label.setFont(QFont("Times", 15, QFont.Bold))
             label.setToolTip(entry["description"])
 
+            # Generating the input and setting its font
             setattr(self, entry["input_name"], QLineEdit())
-            getattr(self, entry["input_name"]).setText(str(entry["default_value"]))
             getattr(self, entry["input_name"]).setFont(QFont("Times", 20, QFont.Bold))
-            # TODO: add validation to only allow for numbers here
+
+            # Including the validation to be able to input only float values
+            getattr(self, entry["input_name"]).setValidator(QDoubleValidator())
+            # For some reason the validation treats floats with commas
+            #   instead of dots, so we must display it in this manner
+            # (Apparently, it is looking into the computer settings for the separator)
+            value = str(entry["default_value"]).replace(".", ",")
+            getattr(self, entry["input_name"]).setText(value)
 
             new_layout.addWidget(label)
             new_layout.addWidget(getattr(self, entry["input_name"]))
@@ -482,15 +489,22 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
         new_layout = QHBoxLayout()
 
+        # Creating the choice of all materials and filling it with them
         self.material_combo_box = QComboBox()
         self.material_combo_box.setFont(QFont("Times", 15, QFont.Bold))
         self.material_combo_box.addItems(material_service.materials_name_list)
-        self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index('Iron'))
+        self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index("Iron"))
+
+        # Defining tooltips for each material containing their properties
+        for index, material in enumerate(material_service.materials_name_list):
+            properties = material_service.materials_properties_dict[material]
+            info = "{} - {}".format(material, str(properties))
+            self.material_combo_box.setItemData(index, info, Qt.ToolTipRole)
 
         label = QLabel("Material: ")
         label.setFont(QFont("Times", 15, QFont.Bold))
 
-        custom_material_button = QPushButton('Custom', self)
+        custom_material_button = QPushButton("Custom", self)
         custom_material_button.clicked.connect(self.get_custom_material)
 
         new_layout.addWidget(label)
@@ -498,8 +512,6 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         new_layout.addWidget(custom_material_button)
 
         parent_layout.addLayout(new_layout)
-        # TODO: add a tooltip with information whenever the material is highlighted:
-        #   https://www.tutorialspoint.com/pyqt/pyqt_qcombobox_widget.htm
 
     def get_custom_material(self):
         """
@@ -518,7 +530,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                 print(error_msg)
                 self.show_message_to_user(error_msg)
             # Otherwise save all the custom data
-            # TODO: we could even save this material to our material file
+            # TODO: we could even save this material to our material file,
+            #   to be available for the user even in the future
             else:
                 # Including the name of new material into the material choice
                 self.material_combo_box.addItem(results["name"])
@@ -526,7 +539,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                 # Choosing the new material in the material choice
                 index = self.material_combo_box.findText(results["name"], Qt.MatchFixedString)
                 if index >= 0:
-                     self.material_combo_box.setCurrentIndex(index)
+                    self.material_combo_box.setCurrentIndex(index)
+
+                # Setting the material properties to be visible in a tooltip
+                info = "{} - {}".format(results["name"], str(results["properties"]))
+                self.material_combo_box.setItemData(index, info, Qt.ToolTipRole)
 
                 # Saving the custom material properties
                 material_service.materials_properties_dict[results["name"]] = results["properties"]
@@ -739,23 +756,42 @@ class CustomMaterialInputDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        # Defining all the input fields and setting their font-size
         self.name = QLineEdit(self)
         self.rho = QLineEdit(self)
         self.cp = QLineEdit(self)
         self.lmbd = QLineEdit(self)
-        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self);
+        for input_field in [self.name, self.rho, self.cp, self.lmbd]:
+            input_field.setFont(QFont("Times", 15, QFont.Bold))
 
+        # Including validation for number values to contain only digits
+        for number_input_field in [self.rho, self.cp, self.lmbd]:
+            number_input_field.setValidator(QDoubleValidator())
+
+        # Defining all the labels and setting their font-size
+        name_label = QLabel("Material name")
+        rho_label = QLabel("Rho [kg/m3]")
+        cp_label = QLabel("Cp [J/(kg*K)]")
+        lambda_label = QLabel("Lambda [W/(m*K)]")
+        for label in [name_label, rho_label, cp_label, lambda_label]:
+            label.setFont(QFont("Times", 15, QFont.Bold))
+
+        # Defining which buttons will be present
+        buttonBox = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+
+        # Including everything into a single layout
         layout = QFormLayout(self)
-        layout.addRow("Material name", self.name)
-        layout.addRow("Rho [kg/m3]", self.rho)
-        layout.addRow("Cp [J/(kg*K)]", self.cp)
-        layout.addRow("Lambda [W/(m*K)]", self.lmbd)
+        layout.addRow(name_label, self.name)
+        layout.addRow(rho_label, self.rho)
+        layout.addRow(cp_label, self.cp)
+        layout.addRow(lambda_label, self.lmbd)
         layout.addWidget(buttonBox)
 
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
 
-        self.setWindowTitle('Custom material choice')
+        self.setWindowTitle("Custom material choice")
 
     def get_inputs(self):
         """
@@ -780,7 +816,7 @@ class CustomMaterialInputDialog(QDialog):
         return returned_info
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Necessary stuff for errors and exceptions to be thrown
     # Without this, the app just dies and says nothing
     sys._excepthook = sys.excepthook  # type: ignore
