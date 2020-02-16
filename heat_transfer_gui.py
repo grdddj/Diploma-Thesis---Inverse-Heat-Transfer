@@ -11,9 +11,9 @@ import time
 import threading
 import queue
 
-from PyQt5.QtGui import QFont, QDoubleValidator # type: ignore
-from PyQt5.QtCore import QThreadPool, Qt # type: ignore
-from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox, # type: ignore
+from PyQt5.QtGui import QFont, QDoubleValidator  # type: ignore
+from PyQt5.QtCore import QThreadPool, Qt  # type: ignore
+from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox,  # type: ignore
     QLabel, QLineEdit, QPushButton, QGroupBox, QRadioButton, QComboBox, QMessageBox,
     QFormLayout, QDialogButtonBox, QApplication, QDialog, QMainWindow)
 
@@ -56,16 +56,30 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         # As material service is dependent on an external file, we need
         #   some error handling in place
         # User will be notified, and the app window will not be even opened,
-        #   as the simulation would be unavailable anyway
+        #   as the simulation would be unavailable anyway if the main
+        #   file with materials is not present
         # NOTE: we can change this behavior to some other logic
         try:
             self.material_service = MaterialService()
             self.add_material_choice(self.verticalLayout_6)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             error_msg = """
             Error happened when getting material data. Please make sure the
             material file is present and start the application again.
-            """
+
+            Missing file: {}
+            """.format(e)
+
+            self.show_error_dialog_to_user(error_msg)
+            raise
+        except Exception as e:
+            error_msg = """
+            Error happened when parsing material data. Please make sure the
+            custom material data file is rightly formatted and start the
+            application again.
+
+            Issue: {}
+            """.format(e)
 
             self.show_error_dialog_to_user(error_msg)
             raise
@@ -86,7 +100,8 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         self.chosen_material = None
 
         # Storing current data file
-        self.current_data_file = "DATA.csv"
+        # Will be included in .exe bundle, therefore the function around it
+        self.current_data_file = resource_path("DATA.csv")
 
         # Variables to keep user informed about the elapsed simulation time
         # TODO: probably create an individual object for this
@@ -552,12 +567,13 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
             # Catching the possible error
             if results == "error":
-                error_msg = "Error happened when parsing custom material data."
+                error_msg = """
+                Error happened when parsing custom material data. Material not
+                saved. Please input all the information in the right format.
+                """
                 print(error_msg)
-                self.show_message_to_user(error_msg)
+                self.show_error_dialog_to_user(error_msg)
             # Otherwise save all the custom data
-            # TODO: we could even save this material to our material file,
-            #   to be available for the user even in the future
             else:
                 # Including the name of new material into the material choice
                 self.material_combo_box.addItem(results["name"])
@@ -571,8 +587,11 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                 info = "{} - {}".format(results["name"], str(results["properties"]))
                 self.material_combo_box.setItemData(index, info, Qt.ToolTipRole)
 
-                # Saving the custom material properties
+                # Saving the custom material properties into a local dictionary
                 self.material_service.materials_properties_dict[results["name"]] = results["properties"]
+
+                # Saving the custom material properties into a file to persist
+                self.material_service.save_custom_user_material(results)
 
     def simulation_finished(self) -> None:
         """
@@ -856,6 +875,21 @@ class CustomMaterialInputDialog(QDialog):
             returned_info = "error"
 
         return returned_info
+
+
+def resource_path(relative_path):
+    """
+    Helper function allowing for bundling the data file together with the .exe
+    """
+
+    # Trying to locate the Temp folder, otherwise using the normal path
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 if __name__ == "__main__":
