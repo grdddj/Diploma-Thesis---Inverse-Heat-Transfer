@@ -30,19 +30,23 @@ class MaterialService:
         """
 
         materials_dictionary = {}
-        # TODO: add some error handling
-        with open("metals_properties.csv", "r") as materials_file:
-            csv_reader = csv.reader(materials_file)
-            next(csv_reader, None)  # skip first line (headers)
-            for row in csv_reader:
-                if row:
-                    name = row[0]
-                    material_properties = {}
+        file_name = "metals_properties.csv"
+        try:
+            with open(file_name, "r") as materials_file:
+                csv_reader = csv.reader(materials_file)
+                next(csv_reader, None)  # skip first line (headers)
+                for row in csv_reader:
+                    if row:
+                        name = row[0]
+                        material_properties = {}
 
-                    material_properties["rho"] = int(row[2])
-                    material_properties["cp"] = int(row[3])
-                    material_properties["lmbd"] = int(row[4])
+                        material_properties["rho"] = int(row[2])
+                        material_properties["cp"] = int(row[3])
+                        material_properties["lmbd"] = int(row[4])
 
-                    materials_dictionary[name] = material_properties
+                        materials_dictionary[name] = material_properties
+        except FileNotFoundError:
+            print("File not found - {}".format(file_name))
+            raise
 
         return materials_dictionary

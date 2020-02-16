@@ -14,9 +14,11 @@ import queue
 from PyQt5.QtGui import QFont, QDoubleValidator # type: ignore
 from PyQt5.QtCore import QThreadPool, Qt # type: ignore
 from PyQt5.QtWidgets import (QFileDialog, QHBoxLayout, QVBoxLayout, QCheckBox, # type: ignore
-    QLabel, QLineEdit, QPushButton, QGroupBox, QRadioButton, QComboBox,
-    QFormLayout, QDialogButtonBox, QApplication, QDialog)
-from PyQt5.uic import loadUiType  # type: ignore
+    QLabel, QLineEdit, QPushButton, QGroupBox, QRadioButton, QComboBox, QMessageBox,
+    QFormLayout, QDialogButtonBox, QApplication, QDialog, QMainWindow)
+
+# Importing the basic layout of the main window
+from heat_transfer_gui_window import Ui_MainWindow
 
 import heat_transfer_simulation
 import heat_transfer_simulation_inverse
@@ -30,15 +32,6 @@ from heat_transfer_materials import MaterialService
 from heat_transfer_user_inputs_classic import UserInputServiceClassic
 from heat_transfer_user_inputs_inverse import UserInputServiceInverse
 
-material_service = MaterialService()
-user_input_service_classic = UserInputServiceClassic()
-user_input_service_inverse = UserInputServiceInverse()
-
-# Creating the UI from the .ui template
-# We could also generate a .py file from it and import it
-#   - worth a try later, now for development purposes this is more comfortable
-Ui_MainWindow, QMainWindow = loadUiType("heat_transfer_gui.ui")
-
 
 class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     """
@@ -47,15 +40,36 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     """
 
     def __init__(self, ):
-        super(HeatTransferWindow, self).__init__()
+        super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Heat transfer")
+
+        # Instantiating the user input services
+        self.user_input_service_classic = UserInputServiceClassic()
+        self.user_input_service_inverse = UserInputServiceInverse()
 
         # Filling the left side with user choice and inputs
         self.add_saving_choices(self.verticalLayout_6)
         self.add_algorithm_choice(self.verticalLayout_6)
         self.add_data_file_choices(self.verticalLayout_6)
-        self.add_material_choice(self.verticalLayout_6)
+
+        # As material service is dependent on an external file, we need
+        #   some error handling in place
+        # User will be notified, and the app window will not be even opened,
+        #   as the simulation would be unavailable anyway
+        # NOTE: we can change this behavior to some other logic
+        try:
+            self.material_service = MaterialService()
+            self.add_material_choice(self.verticalLayout_6)
+        except FileNotFoundError:
+            error_msg = """
+            Error happened when getting material data. Please make sure the
+            material file is present and start the application again.
+            """
+
+            self.show_error_dialog_to_user(error_msg)
+            raise
+
         self.add_user_inputs(self.verticalLayout_6)
 
         # Adding plots for temperature and heat flux
@@ -195,16 +209,20 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
     def show_error_dialog_to_user(self, error_message: str) -> None:
         """
         Displays a separate dialog (alert) informing user of something bad, like
-            invalid user input.
+            invalid user input or simulation errors.
 
         Args:
             error_message ... what should be shown to the user
         """
 
-        # TODO: implement the new window creation
-        self.show_message_to_user(error_message)
-
         print(error_message)
+
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText("Error")
+        msg.setWindowTitle("Error")
+        msg.setInformativeText(error_message)
+        msg.exec_()
 
     def change_user_input(self) -> None:
         """
@@ -286,9 +304,10 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         window_length_label = QLabel("Window length: ")
         window_length_label.setFont(QFont("Times", 15, QFont.Bold))
 
+        # Creating the input, setting its font and a default value
         self.window_length_input = QLineEdit()
-        self.window_length_input.setText("2")
         self.window_length_input.setFont(QFont("Times", 15, QFont.Bold))
+        self.window_length_input.setText("3")
 
         # Creating the controlling buttons
         smooth_btn = QPushButton("Smooth", self)
@@ -422,9 +441,9 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         """
 
         if self.radio_choice_classic.isChecked():
-            return user_input_service_classic
+            return self.user_input_service_classic
         elif self.radio_choice_inverse.isChecked():
-            return user_input_service_inverse
+            return self.user_input_service_inverse
 
     def get_current_algorithm(self) -> str:
         """
@@ -492,12 +511,19 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         # Creating the choice of all materials and filling it with them
         self.material_combo_box = QComboBox()
         self.material_combo_box.setFont(QFont("Times", 15, QFont.Bold))
-        self.material_combo_box.addItems(material_service.materials_name_list)
-        self.material_combo_box.setCurrentIndex(material_service.materials_name_list.index("Iron"))
+        self.material_combo_box.addItems(self.material_service.materials_name_list)
+
+        # Trying to set a default material, which does not have to succeed
+        try:
+            default_material = "Iron"
+            self.material_combo_box.setCurrentIndex(
+                self.material_service.materials_name_list.index(default_material))
+        except ValueError:
+            print("{} was not found in the material list!".format(default_material))
 
         # Defining tooltips for each material containing their properties
-        for index, material in enumerate(material_service.materials_name_list):
-            properties = material_service.materials_properties_dict[material]
+        for index, material in enumerate(self.material_service.materials_name_list):
+            properties = self.material_service.materials_properties_dict[material]
             info = "{} - {}".format(material, str(properties))
             self.material_combo_box.setItemData(index, info, Qt.ToolTipRole)
 
@@ -546,7 +572,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
                 self.material_combo_box.setItemData(index, info, Qt.ToolTipRole)
 
                 # Saving the custom material properties
-                material_service.materials_properties_dict[results["name"]] = results["properties"]
+                self.material_service.materials_properties_dict[results["name"]] = results["properties"]
 
     def simulation_finished(self) -> None:
         """
@@ -613,7 +639,7 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
 
         # Getting current material from GUI and it's peoperties from the service
         self.chosen_material = self.material_combo_box.currentText()
-        current_material_properties = material_service.materials_properties_dict[self.chosen_material]
+        current_material_properties = self.material_service.materials_properties_dict[self.chosen_material]
 
         # Getting all other user input for the simulation
         parameters = self.get_numbers_from_the_user_input()
@@ -657,9 +683,25 @@ class HeatTransferWindow(QMainWindow, Ui_MainWindow):  # type: ignore
         worker.signals.result.connect(self.process_output)
         worker.signals.finished.connect(self.simulation_finished)
         worker.signals.progress.connect(self.update_simulation_time)
+        worker.signals.error.connect(self.handle_simulation_errors)
 
         # Tell the workers to start the job
         self.threadpool.start(worker)
+
+    def handle_simulation_errors(self, error_information: tuple) -> None:
+        """
+        Handles the situations when simulation will not succeed because
+            of some unexpected error.
+        Notifies user about it through a dialog.
+        """
+
+        error_msg = """
+        Some unexpected error happened during the simulation. Please check
+        all the input parameters.
+
+        Error type: {} - {}
+        """.format(error_information[0], error_information[1])
+        self.show_error_dialog_to_user(error_msg)
 
     def update_simulation_time(self, simulation_state: str) -> None:
         """

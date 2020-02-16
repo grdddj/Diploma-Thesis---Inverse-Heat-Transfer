@@ -92,9 +92,9 @@ def _get_average_values_from_results(results: dict) -> dict:
     return averages
 
 
-def show_data_in_jpg(data: dict,
-                     file_name: str,
-                     description: str = "classic") -> None:
+def _show_data_in_jpg(data: dict,
+                      file_name: str,
+                      description: str = "classic") -> None:
     """
     Visualises the results in multiple graphs
     """
@@ -141,12 +141,12 @@ def show_data_in_jpg(data: dict,
         plt.clf()
 
 
-def run_simulation(simulation_func: Callable,
-                   parameters: dict,
-                   temperature_plot=None,
-                   heat_flux_plot=None,
-                   progress_callback=None,
-                   queue=None) -> dict:
+def _run_simulation(simulation_func: Callable,
+                    parameters: dict,
+                    temperature_plot=None,
+                    heat_flux_plot=None,
+                    progress_callback=None,
+                    queue=None) -> dict:
     """
     Runs one simulation with inputted parameters and returns the time and
         error of the simulation
@@ -165,9 +165,9 @@ def run_simulation(simulation_func: Callable,
     }
 
 
-def run_multiple_simulations(simulation_func: Callable,
-                             parameter: str,
-                             values: list) -> dict:
+def _run_multiple_simulations(simulation_func: Callable,
+                              parameter: str,
+                              values: list) -> dict:
     """
     Runs simulations multiple times for all inputted values, that are
         meant to modify certain parameter, and should change the results
@@ -200,8 +200,8 @@ def run_multiple_simulations(simulation_func: Callable,
         parameters[parameter] = value
         print("parameter: {}, value: {}".format(parameter, value))
 
-        result = run_simulation(simulation_func=simulation_func,
-                                parameters=parameters)
+        result = _run_simulation(simulation_func=simulation_func,
+                                 parameters=parameters)
         results[value] = result
         print(result)
 
@@ -226,9 +226,9 @@ def aggregate_all_tests(simulation_func: Callable,
         for scenario in testing_scenarios:
             parameter = scenario["parameter"]
             values = scenario["values"]
-            result = run_multiple_simulations(simulation_func=simulation_func,
-                                              parameter=parameter,
-                                              values=values)
+            result = _run_multiple_simulations(simulation_func=simulation_func,
+                                               parameter=parameter,
+                                               values=values)
 
             results[parameter].append(result)
 
@@ -249,4 +249,4 @@ def aggregate_all_tests(simulation_func: Callable,
         json.dump(averages, outfile, indent=4)
 
     # Saving the data to a graph
-    show_data_in_jpg(data=averages, file_name=file_name, description=description)
+    _show_data_in_jpg(data=averages, file_name=file_name, description=description)

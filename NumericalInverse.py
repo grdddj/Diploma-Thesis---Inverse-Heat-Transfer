@@ -250,7 +250,7 @@ class InverseSimulation(Simulation):  # later abbreviated as Prob
                         self._revert_the_smoothing()
                     elif msg.startswith("smooth__"):
                         # Performing the defined smoothing
-                        # Parsing the window length from the message
+                        # Parsing the window length and smoothing method from the message
                         # Message = smooth__(length)__(method)
                         try:
                             length = int(msg.split("__")[1])

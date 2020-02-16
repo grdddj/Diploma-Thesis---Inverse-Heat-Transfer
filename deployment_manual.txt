@@ -15,3 +15,7 @@ Transferring python GUI app into executable:
   - those flags are making sure the console will be hidden and only
     one file will be created, instead of the whole directory
   pyinstaller -y -F -w  "heat_transfer_gui.py"
+
+Others:
+- transforming .ui file to .py file:
+  python -m PyQt5.uic.pyuic -x heat_transfer_gui.ui -o heat_transfer_gui_window.py
