@@ -85,8 +85,6 @@ class Simulation:  # In later objects abreviated as Sim
         self.T_checkpoint = np.empty(N+1)
         # Placeholder for temperature probes data
         self.T_x0 = len(self.t)*[0.0]
-        # Placeholder for temperature probes data
-        self.T_x0_checkpoint = len(self.t)*[0.0]
 
         # Setup the right interpolation object and save initial T_x0
         self.T_x0_interpolator = predefined_interp_class_factory(self.x0, self.x)
@@ -98,6 +96,10 @@ class Simulation:  # In later objects abreviated as Sim
         #   of the elements and how their temperatures react to incoming heat)
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html
         self.M = csr_matrix(self.dx*self.rho*self.cp*diags([1/6, 4/6, 1/6], [-1, 0, 1], shape=(N+1, N+1)))
+
+        # Applying corrections to the edge elements (the value is halved there)
+        self.M[0, 0] /= 2
+        self.M[-1, -1] /= 2
 
         # Tridiagonal sparse stiffness matrix (contains information about heat
         #   conductivity and how the elements affect each other)
