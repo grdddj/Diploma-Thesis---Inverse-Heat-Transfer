@@ -84,13 +84,16 @@ class TemperaturePlotCanvas(FigureCanvas):
                                                            material,
                                                            int(time_data[-1]))
 
+            base_path = os.path.dirname(os.path.realpath(__file__))
+            absolute_path = os.path.join(base_path, file_name)
+
             # If for some reason there was already the same file, rather not
             #   overwrite it, but create a new file a timestamp as an identifier
-            if os.path.isfile(file_name):
-                file_name = "{}-{}.png".format(file_name.split(".")[0],
-                                               int(time.time()))
+            if os.path.isfile(absolute_path):
+                absolute_path = "{}-{}.png".format(absolute_path.split(".")[0],
+                                                   int(time.time()))
 
-            self.fig.savefig(file_name)
+            self.fig.savefig(absolute_path)
         except IndexError:
             # IndexError happens when there is no calculated data yet
             # (When user clicks STOP button right after RUN button)

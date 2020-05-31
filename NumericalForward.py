@@ -1,4 +1,5 @@
 import csv
+import os
 import time
 import numpy as np    # type: ignore # this has some nice mathematics related functions
 # using so called sparse linear algebra make stuff run way faster (ignoring zeros)
@@ -207,11 +208,13 @@ class Simulation:  # In later objects abreviated as Sim
 
         # TODO: discuss the possible filename structure
         file_name = "Classic-{}.csv".format(int(time.time()))
+        base_path = os.path.dirname(os.path.realpath(__file__))
+        absolute_path = os.path.join(base_path, file_name)
 
         time_data = self.t
         temp_data = self.T_x0
 
-        with open(file_name, "w") as csv_file:
+        with open(absolute_path, "w") as csv_file:
             csv_writer = csv.writer(csv_file)
             headers = ["Time [s]", "Temperature [C]"]
             csv_writer.writerow(headers)

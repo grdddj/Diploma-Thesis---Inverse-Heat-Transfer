@@ -31,7 +31,7 @@ def resource_path(file_name):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.realpath(__file__))
 
     return os.path.join(base_path, file_name)
 
@@ -55,7 +55,7 @@ class MaterialService:
         # Defining filename with custom material data and retrieving its info
         # As we want to access this filename later in saving method,
         #   make it an instance variable
-        self.custom_materials_filename = "custom_user_materials.csv"
+        self.custom_materials_filename = resource_path("custom_user_materials.csv")
         custom_materials = self.get_materials_from_csv_file(
             file_name=self.custom_materials_filename)
 
