@@ -3,7 +3,7 @@ cycler==0.10.0
 kiwisolver==1.1.0
 matplotlib==3.1.2
 mypy==0.750
-numpy==1.17.4
+numpy==1.22.0
 pyparsing==2.4.5
 PyQt5==5.13.2
 PyQt5-sip==12.7.0
